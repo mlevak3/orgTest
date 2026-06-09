@@ -54,12 +54,15 @@ Build se vrti automatski na svaki push (workflow `.github/workflows/android.yml`
    `app-debug.apk`.
 3. Workflow možeš pokrenuti i ručno (**Run workflow**).
 
-Lokalni build (alternativa, treba Android SDK):
+Lokalni build (alternativa, treba Android SDK + Gradle 8.14.3 ili Android Studio):
 
 ```bash
-./gradlew assembleDebug      # → app/build/outputs/apk/debug/app-debug.apk
-./gradlew test               # pokreće testove fiskalizacijske jezgre
+gradle assembleDebug      # → app/build/outputs/apk/debug/app-debug.apk
+gradle test               # pokreće testove fiskalizacijske jezgre
 ```
+
+> Ako koristiš Gradle wrapper, prvo ga generiraj: `gradle wrapper --gradle-version 8.14.3`.
+> Android Studio ga generira automatski pri otvaranju projekta.
 
 ---
 
