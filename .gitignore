@@ -1,0 +1,19 @@
+# Gradle
+.gradle/
+build/
+**/build/
+
+# Android Studio / IntelliJ
+.idea/
+*.iml
+local.properties
+.cxx/
+
+# Keystores / certifikati — NIKAD u repozitorij
+*.p12
+*.pfx
+*.jks
+*.keystore
+
+# OS
+.DS_Store
