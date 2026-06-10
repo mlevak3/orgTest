@@ -1,5 +1,6 @@
 package hr.obrt.fiskal.ui
 
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
@@ -10,11 +11,15 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import hr.obrt.fiskal.fiskal.FiskalRezultat
+import hr.obrt.fiskal.fiskal.QrRenderer
+import hr.obrt.fiskal.fiskal.ReceiptPrinter
 import hr.obrt.fiskal.model.NacinPlac
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -183,11 +188,33 @@ private fun ResultView(vm: AppViewModel, modifier: Modifier) {
         item { Polje("JIR", ishod.jir ?: "— (nije dodijeljen)") }
         item { Polje("ZKI", ishod.zki) }
         item {
-            Button(onClick = { vm.resetRacun() }, modifier = Modifier.fillMaxWidth()) {
+            Text("QR kôd (provjera računa)", style = MaterialTheme.typography.labelLarge)
+            QrSlika(ishod.qrUrl)
+        }
+        item {
+            val ctx = LocalContext.current
+            Button(
+                onClick = { ReceiptPrinter.print(ctx, ishod) },
+                modifier = Modifier.fillMaxWidth(),
+            ) { Text("Ispiši / spremi PDF") }
+        }
+        item {
+            OutlinedButton(onClick = { vm.resetRacun() }, modifier = Modifier.fillMaxWidth()) {
                 Text("Novi račun")
             }
+            Spacer(Modifier.height(24.dp))
         }
     }
+}
+
+@Composable
+private fun QrSlika(qrUrl: String) {
+    val bitmap = remember(qrUrl) { QrRenderer.toBitmap(qrUrl, size = 600).asImageBitmap() }
+    Image(
+        bitmap = bitmap,
+        contentDescription = "QR kôd računa",
+        modifier = Modifier.size(220.dp),
+    )
 }
 
 @Composable

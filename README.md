@@ -22,6 +22,10 @@ račun), **C** (ček), **O** (ostalo).
 3. **XML potpis (XML‑DSig, enveloped)** — `rsa-sha1`, `sha1`, `exc-c14n#`,
    `KeyInfo` s X.509 certifikatom i izdavateljem/serijskim brojem.
 4. **Slanje na CIS** preko SOAP/HTTPS (port 8449) i parsiranje **JIR**‑a ili greške.
+5. **QR kôd** na računu (`https://porezna.gov.hr/rn?jir=…&datv=…&izn=…`, razina L) —
+   prikaz na ekranu i u ispisu. Ako JIR nije dodijeljen, QR koristi `zki`.
+6. **Ispis / PDF računa** putem Android sustava ispisa (zaglavlje, stavke, ukupno,
+   JIR, ZKI i QR) — odaberi pisač ili „Spremi kao PDF".
 
 Okoline:
 

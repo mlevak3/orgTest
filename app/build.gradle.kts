@@ -68,4 +68,7 @@ dependencies {
 
     // HTTPS / SOAP transport.
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
+
+    // Generiranje QR koda za račun.
+    implementation("com.google.zxing:core:3.5.3")
 }

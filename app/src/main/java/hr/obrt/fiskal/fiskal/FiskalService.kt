@@ -4,9 +4,12 @@ import hr.obrt.fiskal.model.Racun
 
 /** Konačni ishod fiskalizacije: uvijek vraća ZKI (računa se lokalno), a JIR ako je uspjelo. */
 data class FiskalIshod(
+    val racun: Racun,
     val zki: String,
     val jir: String?,
     val rezultat: FiskalRezultat,
+    /** Sadržaj QR koda za provjeru računa (koristi JIR, a ZKI ako JIR nedostaje). */
+    val qrUrl: String,
     /** Potpisani SOAP zahtjev (za dijagnostiku / ispis). */
     val zahtjevXml: String,
 )
@@ -44,7 +47,16 @@ class FiskalService(
         val rezultat = FiskalClient(okolina, ignoreTlsTrust).posalji(soap)
         val jir = (rezultat as? FiskalRezultat.Uspjeh)?.jir
 
-        return FiskalIshod(zki = zki, jir = jir, rezultat = rezultat, zahtjevXml = soap)
+        val qrUrl = QrCodeContent.build(jir, zki, racun.datVrijeme, racun.iznosUkupno)
+
+        return FiskalIshod(
+            racun = racun,
+            zki = zki,
+            jir = jir,
+            rezultat = rezultat,
+            qrUrl = qrUrl,
+            zahtjevXml = soap,
+        )
     }
 
     private fun wrapSoap(racunZahtjevSigned: String): String =
