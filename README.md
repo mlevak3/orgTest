@@ -129,14 +129,12 @@ Tada račun **NIJE** fiskaliziran (zahtjev nije ni stigao do CIS-a, JIR nije
 dodijeljen) — ZKI je izračunat i račun se mora naknadno dostaviti.
 
 Rješenje:
-1. Na `fina.hr` (CA certifikati) preuzmi **Fina Root CA** i **Fina RDC 2020 CA**
-   (PEM ili DER).
-2. U aplikaciji: **Postavke → FINA CA certifikat → Učitaj CA** (može i jedna PEM
-   datoteka s oba certifikata).
-3. Ponovno fiskaliziraj — aplikacija sada vjeruje tom lancu (uz sistemske CA).
-
-Alternativno, certifikate možeš ugraditi u build kao `app/src/main/res/raw/fina_ca`
-(PEM lanac) — aplikacija ih automatski učita.
+1. **Već ugrađeno:** `Fina Root CA` + `Fina RDC 2020 CA` nalaze se u
+   `app/src/main/res/raw/fina_ca.pem` i aplikacija im automatski vjeruje.
+   Za većinu uređaja produkcija radi odmah nakon instalacije.
+2. Ako lanac ikad zatreba osvježiti (FINA promijeni CA), u **Postavke →
+   FINA CA certifikat → Učitaj CA** uvezi nove certifikate (PEM ili DER);
+   uvezeni se dodaju uz ugrađene i sistemske CA.
 
 ## Sigurnost
 
