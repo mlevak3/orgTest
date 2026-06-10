@@ -15,3 +15,4 @@ dependencyResolutionManagement {
 
 rootProject.name = "FiskalObrt"
 include(":app")
+include(":core")

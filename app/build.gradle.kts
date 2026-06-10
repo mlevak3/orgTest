@@ -47,6 +47,9 @@ android {
 }
 
 dependencies {
+    // Čista JVM jezgra fiskalizacije (ZKI, XML potpis, model).
+    implementation(project(":core"))
+
     val composeBom = platform("androidx.compose:compose-bom:2024.06.00")
     implementation(composeBom)
 
@@ -65,9 +68,4 @@ dependencies {
 
     // HTTPS / SOAP transport.
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
-
-    // Pure-JVM unit tests for the fiscalization core (ZKI, C14N, XML).
-    testImplementation("junit:junit:4.13.2")
-    testImplementation("org.bouncycastle:bcprov-jdk18on:1.78.1")
-    testImplementation("org.bouncycastle:bcpkix-jdk18on:1.78.1")
 }
