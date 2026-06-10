@@ -65,7 +65,12 @@ class FiskalClient(
         return try {
             val dbf = DocumentBuilderFactory.newInstance().apply {
                 isNamespaceAware = true
-                setFeature("http://apache.org/xml/features/disallow-doctype-decl", true)
+                // Sigurnosne postavke — neke verzije Android parsera ih ne podržavaju,
+                // pa ih postavljamo "best effort" (odgovor dolazi s pouzdanog TLS endpointa).
+                runCatching { setFeature("http://apache.org/xml/features/disallow-doctype-decl", true) }
+                runCatching { setFeature("http://xml.org/sax/features/external-general-entities", false) }
+                runCatching { setFeature("http://xml.org/sax/features/external-parameter-entities", false) }
+                runCatching { isExpandEntityReferences = false }
             }
             val doc = dbf.newDocumentBuilder()
                 .parse(ByteArrayInputStream(xml.toByteArray(Charsets.UTF_8)))
@@ -86,7 +91,15 @@ class FiskalClient(
 
             FiskalRezultat.Iznimka("Neprepoznat odgovor:\n${xml.take(500)}")
         } catch (e: Exception) {
-            FiskalRezultat.Iznimka("Greška pri čitanju odgovora: ${e.message}")
+            // Rezervno: izvuci JIR/grešku regexom ako DOM parsiranje zakaže.
+            jirRegex.find(xml)?.groupValues?.get(1)?.takeIf { it.isNotBlank() }
+                ?.let { return FiskalRezultat.Uspjeh(it) }
+            val sifra = sifraRegex.find(xml)?.groupValues?.get(1)
+            val poruka = porukaRegex.find(xml)?.groupValues?.get(1)
+            if (sifra != null || poruka != null) {
+                return FiskalRezultat.Greska(sifra.orEmpty(), poruka.orEmpty())
+            }
+            FiskalRezultat.Iznimka("Greška pri čitanju odgovora: ${e.message}\n${xml.take(300)}")
         }
     }
 
@@ -123,5 +136,8 @@ class FiskalClient(
 
     companion object {
         private val XML_MEDIA = "text/xml; charset=utf-8".toMediaType()
+        private val jirRegex = Regex("<(?:\\w+:)?Jir>([^<]+)</")
+        private val sifraRegex = Regex("<(?:\\w+:)?SifraGreske>([^<]+)</")
+        private val porukaRegex = Regex("<(?:\\w+:)?PorukaGreske>([^<]+)</")
     }
 }
