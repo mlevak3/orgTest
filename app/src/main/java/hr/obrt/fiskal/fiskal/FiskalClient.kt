@@ -37,6 +37,7 @@ sealed interface FiskalRezultat {
 class FiskalClient(
     private val okolina: FiskalOkolina,
     private val ignoreTlsTrust: Boolean = false,
+    private val extraCaCerts: List<X509Certificate> = emptyList(),
 ) {
     private val http: OkHttpClient by lazy { buildClient() }
 
@@ -112,6 +113,10 @@ class FiskalClient(
             ctx.init(null, arrayOf(trustAll), java.security.SecureRandom())
             builder.sslSocketFactory(ctx.socketFactory, trustAll)
             builder.hostnameVerifier { _, _ -> true }
+        } else {
+            // Sistemski CA + (opcionalno) uvezeni FINA CA certifikati.
+            val tm = CompositeX509TrustManager(extraCaCerts)
+            builder.sslSocketFactory(TlsTrust.sslContext(tm).socketFactory, tm)
         }
         return builder.build()
     }

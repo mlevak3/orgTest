@@ -16,6 +16,7 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import hr.obrt.fiskal.fiskal.FiskalCertificate
 import hr.obrt.fiskal.fiskal.FiskalOkolina
+import hr.obrt.fiskal.fiskal.TlsTrust
 import hr.obrt.fiskal.model.OznSlijed
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -35,6 +36,7 @@ fun SettingsScreen(vm: AppViewModel, onBack: () -> Unit) {
     var lozinka by remember { mutableStateOf(repo.certPassword) }
     var broj by remember { mutableStateOf(repo.sljedeciBroj.toString()) }
     var certInfo by remember { mutableStateOf(certStatus(repo.certifikatPostoji())) }
+    var caInfo by remember { mutableStateOf(caStatus(repo.caPostoji())) }
     var poruka by remember { mutableStateOf<String?>(null) }
 
     val picker = rememberLauncherForActivityResult(
@@ -47,6 +49,21 @@ fun SettingsScreen(vm: AppViewModel, onBack: () -> Unit) {
                 certInfo = certStatus(true)
                 poruka = "Certifikat učitan (${bytes.size} B). Unesi lozinku i spremi."
             }.onFailure { poruka = "Greška pri učitavanju: ${it.message}" }
+        }
+    }
+
+    val caPicker = rememberLauncherForActivityResult(
+        ActivityResultContracts.OpenDocument()
+    ) { uri ->
+        if (uri != null) {
+            runCatching {
+                val bytes = ctx.contentResolver.openInputStream(uri)!!.use { it.readBytes() }
+                val certs = TlsTrust.parseCertificates(bytes.inputStream())
+                require(certs.isNotEmpty()) { "Datoteka ne sadrži X.509 certifikate." }
+                repo.spremiCa(bytes)
+                caInfo = "Status: učitano (${certs.size} certifikat/a)."
+                poruka = "FINA CA učitan (${certs.size} certifikat/a)."
+            }.onFailure { poruka = "Greška pri učitavanju CA: ${it.message}" }
         }
     }
 
@@ -126,6 +143,24 @@ fun SettingsScreen(vm: AppViewModel, onBack: () -> Unit) {
             )
 
             Divider()
+            Text("FINA CA certifikat (TLS — za PRODUKCIJU)", style = MaterialTheme.typography.titleMedium)
+            Text(caInfo, style = MaterialTheme.typography.bodySmall)
+            Text(
+                "Rješava grešku Trust anchor not found. Skini s fina.hr (CA certifikati) " +
+                    "Fina Root CA i Fina RDC 2020 CA (PEM ili DER) pa ih učitaj ovdje. " +
+                    "Možeš učitati i jednu PEM datoteku s oba certifikata.",
+                style = MaterialTheme.typography.bodySmall,
+            )
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Button(onClick = { caPicker.launch(arrayOf("*/*")) }) { Text("Učitaj CA") }
+                if (repo.caPostoji()) {
+                    OutlinedButton(onClick = {
+                        repo.obrisiCa(); caInfo = caStatus(false); poruka = "FINA CA uklonjen."
+                    }) { Text("Ukloni") }
+                }
+            }
+
+            Divider()
             Text("Okolina i numeracija", style = MaterialTheme.typography.titleMedium)
             EnumRedak(
                 naslov = "Okolina",
@@ -180,6 +215,9 @@ fun SettingsScreen(vm: AppViewModel, onBack: () -> Unit) {
 
 private fun certStatus(postoji: Boolean) =
     if (postoji) "Status: certifikat učitan." else "Status: certifikat NIJE učitan."
+
+private fun caStatus(postoji: Boolean) =
+    if (postoji) "Status: FINA CA učitan." else "Status: FINA CA NIJE učitan."
 
 @Composable
 private fun <T> EnumRedak(

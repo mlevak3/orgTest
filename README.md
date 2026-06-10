@@ -115,6 +115,29 @@ Pokretanje: `./gradlew test` (radi i u CI‑ju prije builda APK‑a).
 
 ---
 
+## TLS / FINA CA (PRODUKCIJA)
+
+Produkcijski CIS (`cis.porezna-uprava.hr:8449`) koristi poslužiteljski certifikat
+izdan od **Fina RDC 2020 CA** (potpisan **Fina Root CA**). Ako taj lanac nije u
+Android trust storeu, javlja se greška:
+
+```
+java.security.cert.CertPathValidatorException: Trust anchor … not found
+```
+
+Tada račun **NIJE** fiskaliziran (zahtjev nije ni stigao do CIS-a, JIR nije
+dodijeljen) — ZKI je izračunat i račun se mora naknadno dostaviti.
+
+Rješenje:
+1. Na `fina.hr` (CA certifikati) preuzmi **Fina Root CA** i **Fina RDC 2020 CA**
+   (PEM ili DER).
+2. U aplikaciji: **Postavke → FINA CA certifikat → Učitaj CA** (može i jedna PEM
+   datoteka s oba certifikata).
+3. Ponovno fiskaliziraj — aplikacija sada vjeruje tom lancu (uz sistemske CA).
+
+Alternativno, certifikate možeš ugraditi u build kao `app/src/main/res/raw/fina_ca`
+(PEM lanac) — aplikacija ih automatski učita.
+
 ## Sigurnost
 
 - Lozinka certifikata i konfiguracija čuvaju se u **EncryptedSharedPreferences**.

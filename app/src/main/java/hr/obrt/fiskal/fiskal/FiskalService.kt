@@ -25,6 +25,7 @@ class FiskalService(
     private val certificate: FiskalCertificate,
     private val okolina: FiskalOkolina,
     private val ignoreTlsTrust: Boolean = false,
+    private val extraCaCerts: List<java.security.cert.X509Certificate> = emptyList(),
 ) {
     fun fiskaliziraj(racun: Racun): FiskalIshod {
         val z = racun.zaglavlje
@@ -44,7 +45,7 @@ class FiskalService(
         val signed = XmlSigner.sign(built.racunZahtjev, certificate.privateKey, certificate.certificate)
         val soap = wrapSoap(signed)
 
-        val rezultat = FiskalClient(okolina, ignoreTlsTrust).posalji(soap)
+        val rezultat = FiskalClient(okolina, ignoreTlsTrust, extraCaCerts).posalji(soap)
         val jir = (rezultat as? FiskalRezultat.Uspjeh)?.jir
 
         val qrUrl = QrCodeContent.build(jir, zki, racun.datVrijeme, racun.iznosUkupno)

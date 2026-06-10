@@ -31,6 +31,7 @@ class SettingsRepository(context: Context) {
     }
 
     private val certFile: File get() = File(appContext.filesDir, "fina_cert.p12")
+    private val caFile: File get() = File(appContext.filesDir, "fina_ca.pem")
 
     var oib: String
         get() = prefs.getString(K_OIB, "") ?: ""
@@ -88,6 +89,14 @@ class SettingsRepository(context: Context) {
     fun obrisiCertifikat() {
         certFile.delete()
         certPassword = ""
+    }
+
+    // FINA CA certifikat(i) za TLS povjerenje prema produkcijskom CIS-u.
+    fun spremiCa(bytes: ByteArray) = caFile.writeBytes(bytes)
+    fun caPostoji(): Boolean = caFile.exists() && caFile.length() > 0
+    fun caBytes(): ByteArray? = if (caPostoji()) caFile.readBytes() else null
+    fun obrisiCa() {
+        caFile.delete()
     }
 
     companion object {

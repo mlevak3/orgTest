@@ -6,6 +6,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import hr.obrt.fiskal.data.SettingsRepository
+import hr.obrt.fiskal.fiskal.CaStore
 import hr.obrt.fiskal.fiskal.FiskalCertificate
 import hr.obrt.fiskal.fiskal.FiskalIshod
 import hr.obrt.fiskal.fiskal.FiskalRezultat
@@ -84,6 +85,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         val bytes = repo.certifikatBytes()
             ?: throw IllegalStateException("Certifikat nije učitan. Otvori Postavke.")
         val cert = FiskalCertificate.load(bytes.inputStream(), repo.certPassword.toCharArray())
+        val caCerts = CaStore.loadExtraCas(getApplication(), repo.caBytes())
 
         val racun = Racun(
             zaglavlje = repo.zaglavlje,
@@ -100,7 +102,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             nacinPlac = nacinPlac.value,
         )
 
-        val service = FiskalService(cert, repo.okolina, repo.ignoreTlsTrust)
+        val service = FiskalService(cert, repo.okolina, repo.ignoreTlsTrust, caCerts)
         val ishod = service.fiskaliziraj(racun)
 
         // Broj računa povećavamo tek kad je CIS prihvatio (vratio JIR).
