@@ -26,12 +26,20 @@ import java.math.RoundingMode
 import java.util.Date
 import java.util.UUID
 
-/** Stavka u obrascu (tekstualni unos). */
+/**
+ * Stavka u obrascu (tekstualni unos).
+ * [jedCijena] je jedinična cijena bez PDV-a (za PDV obveznika) odnosno cijena
+ * (za neobveznika). [neto], [pdvIznos] i [ukupno] su izračunati, ali ih korisnik
+ * može ručno korigirati (zaokruživanje).
+ */
 data class StavkaInput(
     var naziv: String = "",
     var kolicina: String = "1",
-    var cijena: String = "",
+    var jedCijena: String = "",
     var pdvStopa: String = "25",
+    var neto: String = "",
+    var pdvIznos: String = "",
+    var ukupno: String = "",
 )
 
 class AppViewModel(app: Application) : AndroidViewModel(app) {
@@ -91,15 +99,42 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     // --- Stavke ---
     fun dodajStavku() = stavke.add(StavkaInput())
     fun ukloniStavku(index: Int) { if (stavke.size > 1) stavke.removeAt(index) }
-    fun azurirajStavku(index: Int, novo: StavkaInput) { stavke[index] = novo }
+
+    private fun uSustavuPdv(): Boolean = selected.value?.uSustavuPdv == true
+    private fun fmt(b: BigDecimal): String = b.setScale(2, RoundingMode.HALF_UP).toPlainString()
+
+    fun setNaziv(i: Int, v: String) { stavke[i] = stavke[i].copy(naziv = v) }
+    fun setKolicina(i: Int, v: String) { stavke[i] = preracunajBazu(stavke[i].copy(kolicina = v)) }
+    fun setJedCijena(i: Int, v: String) { stavke[i] = preracunajBazu(stavke[i].copy(jedCijena = v)) }
+    fun setStopa(i: Int, v: String) { stavke[i] = preracunajOdNeto(stavke[i].copy(pdvStopa = v)) }
+    fun setNeto(i: Int, v: String) { stavke[i] = preracunajOdNeto(stavke[i].copy(neto = v)) }
+    fun setPdvIznos(i: Int, v: String) {
+        val s = stavke[i].copy(pdvIznos = v)
+        stavke[i] = s.copy(ukupno = fmt(parse(s.neto).add(parse(s.pdvIznos))))
+    }
+    fun setUkupno(i: Int, v: String) { stavke[i] = stavke[i].copy(ukupno = v) }
+
+    /** Iz količine i jedinične cijene izračuna neto, pa PDV i ukupno. */
+    private fun preracunajBazu(s: StavkaInput): StavkaInput {
+        val neto = parse(s.kolicina).multiply(parse(s.jedCijena)).setScale(2, RoundingMode.HALF_UP)
+        return if (uSustavuPdv()) {
+            val pdv = neto.multiply(parse(s.pdvStopa)).divide(BigDecimal(100)).setScale(2, RoundingMode.HALF_UP)
+            s.copy(neto = fmt(neto), pdvIznos = fmt(pdv), ukupno = fmt(neto.add(pdv)))
+        } else {
+            s.copy(neto = fmt(neto), pdvIznos = "0.00", ukupno = fmt(neto))
+        }
+    }
+
+    /** Iz neta i stope izračuna PDV i ukupno (neto je zadan). */
+    private fun preracunajOdNeto(s: StavkaInput): StavkaInput {
+        val neto = parse(s.neto)
+        val pdv = neto.multiply(parse(s.pdvStopa)).divide(BigDecimal(100)).setScale(2, RoundingMode.HALF_UP)
+        return s.copy(pdvIznos = fmt(pdv), ukupno = fmt(neto.add(pdv)))
+    }
 
     fun ukupno(): BigDecimal =
-        try {
-            stavke.fold(BigDecimal.ZERO) { acc, s -> acc.add(parse(s.kolicina).multiply(parse(s.cijena))) }
-                .setScale(2, RoundingMode.HALF_UP)
-        } catch (_: Exception) {
-            BigDecimal.ZERO
-        }
+        stavke.fold(BigDecimal.ZERO) { acc, s -> acc.add(parse(s.ukupno)) }
+            .setScale(2, RoundingMode.HALF_UP)
 
     fun fiskaliziraj() {
         greska.value = null
@@ -135,11 +170,14 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             brOznRac = t.sljedeciBroj,
             datVrijeme = Date(),
             stavke = stavke.map {
+                val neto = parse(it.neto)
                 Stavka(
                     naziv = it.naziv,
                     kolicina = parse(it.kolicina),
-                    jedinicnaCijena = parse(it.cijena),
                     pdvStopa = parse(it.pdvStopa),
+                    neto = neto,
+                    pdvIznos = parse(it.pdvIznos),
+                    ukupno = parse(it.ukupno),
                 )
             },
             nacinPlac = nacinPlac.value,
@@ -182,8 +220,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         if (t.oib.length != 11) return "OIB tvrtke mora imati 11 znamenki (Postavke)."
         if (!companyStore.certPostoji(t.id)) return "FINA certifikat nije učitan (Postavke tvrtke)."
         if (companyStore.lozinka(t.id).isBlank()) return "Lozinka certifikata nije postavljena (Postavke)."
-        if (stavke.none { it.naziv.isNotBlank() && parse(it.cijena) > BigDecimal.ZERO })
-            return "Dodaj barem jednu stavku s cijenom."
+        if (stavke.none { it.naziv.isNotBlank() && parse(it.ukupno) > BigDecimal.ZERO })
+            return "Dodaj barem jednu stavku s iznosom."
         return null
     }
 

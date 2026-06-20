@@ -128,12 +128,13 @@ fun InvoiceScreen(
 @Composable
 private fun StavkaRedak(vm: AppViewModel, index: Int) {
     val s = vm.stavke[index]
+    val pdv = vm.selected.value?.uSustavuPdv == true
     Card {
         Column(Modifier.padding(10.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 OutlinedTextField(
                     value = s.naziv,
-                    onValueChange = { vm.azurirajStavku(index, s.copy(naziv = it)) },
+                    onValueChange = { vm.setNaziv(index, it) },
                     label = { Text("Naziv stavke") },
                     singleLine = true,
                     modifier = Modifier.weight(1f),
@@ -143,35 +144,46 @@ private fun StavkaRedak(vm: AppViewModel, index: Int) {
                 }
             }
             Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                OutlinedTextField(
-                    value = s.kolicina,
-                    onValueChange = { vm.azurirajStavku(index, s.copy(kolicina = it)) },
-                    label = { Text("Količina") },
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                    singleLine = true,
-                    modifier = Modifier.weight(1f),
-                )
-                OutlinedTextField(
-                    value = s.cijena,
-                    onValueChange = { vm.azurirajStavku(index, s.copy(cijena = it)) },
-                    label = { Text("Cijena (€)") },
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                    singleLine = true,
-                    modifier = Modifier.weight(1f),
-                )
-                if (vm.selected.value?.uSustavuPdv == true) {
-                    OutlinedTextField(
-                        value = s.pdvStopa,
-                        onValueChange = { vm.azurirajStavku(index, s.copy(pdvStopa = it)) },
-                        label = { Text("PDV %") },
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                        singleLine = true,
-                        modifier = Modifier.weight(0.8f),
-                    )
+                DecimalPolje(s.kolicina, "Količina", Modifier.weight(1f)) { vm.setKolicina(index, it) }
+                DecimalPolje(
+                    s.jedCijena,
+                    if (pdv) "Jed. cijena (neto)" else "Cijena (€)",
+                    Modifier.weight(1.2f),
+                ) { vm.setJedCijena(index, it) }
+                if (pdv) {
+                    DecimalPolje(s.pdvStopa, "PDV %", Modifier.weight(0.8f)) { vm.setStopa(index, it) }
                 }
+            }
+            if (pdv) {
+                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    DecimalPolje(s.neto, "Neto (€)", Modifier.weight(1f)) { vm.setNeto(index, it) }
+                    DecimalPolje(s.pdvIznos, "Iznos PDV (€)", Modifier.weight(1f)) { vm.setPdvIznos(index, it) }
+                    DecimalPolje(s.ukupno, "Ukupno (€)", Modifier.weight(1f)) { vm.setUkupno(index, it) }
+                }
+                Text(
+                    "PDV i Ukupno se računaju automatski; možeš ih ručno ispraviti.",
+                    style = MaterialTheme.typography.bodySmall,
+                )
+            } else {
+                Text(
+                    "Ukupno: ${s.ukupno.ifBlank { "0.00" }} €",
+                    style = MaterialTheme.typography.titleMedium,
+                )
             }
         }
     }
+}
+
+@Composable
+private fun DecimalPolje(value: String, label: String, modifier: Modifier, onChange: (String) -> Unit) {
+    OutlinedTextField(
+        value = value,
+        onValueChange = onChange,
+        label = { Text(label) },
+        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+        singleLine = true,
+        modifier = modifier,
+    )
 }
 
 @Composable

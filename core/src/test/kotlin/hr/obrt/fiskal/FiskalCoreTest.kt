@@ -54,7 +54,16 @@ class FiskalCoreTest {
         ),
         brOznRac = 1,
         datVrijeme = Date(0),
-        stavke = listOf(Stavka("Usluga", BigDecimal("1"), BigDecimal("125.00"), BigDecimal("25"))),
+        stavke = listOf(
+            Stavka(
+                naziv = "Usluga",
+                kolicina = BigDecimal("1"),
+                pdvStopa = BigDecimal("25"),
+                neto = BigDecimal("100.00"),
+                pdvIznos = BigDecimal("25.00"),
+                ukupno = BigDecimal("125.00"),
+            )
+        ),
         nacinPlac = NacinPlac.G,
     )
 

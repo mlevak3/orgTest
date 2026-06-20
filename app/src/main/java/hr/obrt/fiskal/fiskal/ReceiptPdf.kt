@@ -32,7 +32,8 @@ object ReceiptPdf {
         val urlLines = wrap(data.qrUrl, tiny, pageWidth - 2 * margin)
         val pdvBroj = if (z.uSustavuPdv) r.pdvGrupe().size + 1 else 1
         val brojLinija = 6 + 1 + 1 + r.stavke.size + 1 + pdvBroj + 1 + 1 + 1 + 1
-        val height = (margin * 2 + brojLinija * lineH + 12 + qrSize + 8 +
+        val pdvPodredci = if (z.uSustavuPdv) r.stavke.size else 0
+        val height = (margin * 2 + brojLinija * lineH + pdvPodredci * tinyH + 12 + qrSize + 8 +
             (1 + urlLines.size) * tinyH + 16).toInt()
 
         val doc = PdfDocument()
@@ -61,10 +62,16 @@ object ReceiptPdf {
         line("Datum: $datum")
         line("Operater: ${z.oibOper}")
         sep()
-        line("Stavka", "Iznos", bold)
+        line("Stavka", "Ukupno", bold)
         r.stavke.forEach { s ->
-            val naziv = "${s.naziv} (${s.kolicina.toPlainString()}×${FiskalFormat.amount(s.jedinicnaCijena)})"
-            line(naziv.take(34), FiskalFormat.amount(s.ukupno))
+            line(s.naziv.take(34), FiskalFormat.amount(s.ukupno))
+            if (z.uSustavuPdv) {
+                c.drawText(
+                    "  neto ${FiskalFormat.amount(s.neto)} · PDV ${FiskalFormat.amount(s.pdvStopa)}% = ${FiskalFormat.amount(s.pdvIznos)}",
+                    margin, y, tiny,
+                )
+                y += tinyH
+            }
         }
         line("UKUPNO (EUR):", FiskalFormat.amount(r.iznosUkupno), bold)
         if (z.uSustavuPdv) {

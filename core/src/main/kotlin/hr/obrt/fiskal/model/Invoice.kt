@@ -22,18 +22,23 @@ enum class OznSlijed(val oznaka: String, val opis: String) {
     P("P", "Na razini poslovnog prostora");
 }
 
-/** Jedna stavka računa. Cijena je jedinična cijena s PDV-om kada je obveznik u sustavu PDV-a. */
+/**
+ * Jedna stavka računa. Iznosi su eksplicitni kako bi korisnik mogao ručno
+ * korigirati PDV/ukupno (zaokruživanje):
+ *  - [neto]     — osnovica bez PDV-a,
+ *  - [pdvIznos] — iznos PDV-a,
+ *  - [ukupno]   — neto + PDV (ili ručno postavljeno).
+ *
+ * Za obveznika koji nije u sustavu PDV-a: pdvStopa = 0, pdvIznos = 0, neto = ukupno.
+ */
 data class Stavka(
     val naziv: String,
     val kolicina: BigDecimal,
-    val jedinicnaCijena: BigDecimal,
-    /** PDV stopa u postotcima (npr. 25.00). Ignorira se ako obveznik nije u sustavu PDV-a. */
     val pdvStopa: BigDecimal,
-) {
-    /** Ukupna vrijednost stavke (količina × jedinična cijena), zaokruženo na 2 decimale. */
-    val ukupno: BigDecimal
-        get() = kolicina.multiply(jedinicnaCijena).setScale(2, RoundingMode.HALF_UP)
-}
+    val neto: BigDecimal,
+    val pdvIznos: BigDecimal,
+    val ukupno: BigDecimal,
+)
 
 /** Zaglavlje računa — fiksni podaci obveznika i poslovnog prostora. */
 data class Zaglavlje(
@@ -57,26 +62,25 @@ data class Racun(
     /** Porezna grupa: stopa → (osnovica, iznos poreza). */
     data class PdvGrupa(val stopa: BigDecimal, val osnovica: BigDecimal, val iznos: BigDecimal)
 
-    /** Računa PDV grupe iz stavki (samo kada je obveznik u sustavu PDV-a). */
+    /** PDV grupe iz stavki — zbroj neto i PDV iznosa po stopi (samo za PDV obveznika). */
     fun pdvGrupe(): List<PdvGrupa> {
         if (!zaglavlje.uSustavuPdv) return emptyList()
         return stavke
             .groupBy { it.pdvStopa }
             .toSortedMap()
-            .map { (stopa, stavke) ->
-                val brutoStope = stavke.sumOf2 { it.ukupno }
-                // jedinična cijena uključuje PDV → osnovica = bruto / (1 + stopa/100)
-                val faktor = BigDecimal.ONE.add(stopa.divide(BigDecimal(100)))
-                val osnovica = brutoStope.divide(faktor, 2, RoundingMode.HALF_UP)
-                val iznos = brutoStope.subtract(osnovica).setScale(2, RoundingMode.HALF_UP)
-                PdvGrupa(stopa.setScale(2, RoundingMode.HALF_UP), osnovica, iznos)
+            .map { (stopa, items) ->
+                PdvGrupa(
+                    stopa = stopa.setScale(2, RoundingMode.HALF_UP),
+                    osnovica = items.zbroj { it.neto },
+                    iznos = items.zbroj { it.pdvIznos },
+                )
             }
     }
 
-    /** Ukupan iznos računa (zbroj svih stavki), zaokruženo na 2 decimale. */
+    /** Ukupan iznos računa (zbroj svih stavki). */
     val iznosUkupno: BigDecimal
-        get() = stavke.sumOf2 { it.ukupno }.setScale(2, RoundingMode.HALF_UP)
+        get() = stavke.zbroj { it.ukupno }
 }
 
-private inline fun <T> List<T>.sumOf2(selector: (T) -> BigDecimal): BigDecimal =
-    fold(BigDecimal.ZERO) { acc, e -> acc.add(selector(e)) }
+private inline fun <T> List<T>.zbroj(selector: (T) -> BigDecimal): BigDecimal =
+    fold(BigDecimal.ZERO) { acc, e -> acc.add(selector(e)) }.setScale(2, RoundingMode.HALF_UP)

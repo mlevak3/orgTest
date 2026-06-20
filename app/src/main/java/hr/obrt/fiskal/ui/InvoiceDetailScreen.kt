@@ -47,9 +47,17 @@ fun InvoiceDetailScreen(vm: AppViewModel, onBack: () -> Unit) {
             item { Text("Datum: $datum", style = MaterialTheme.typography.bodySmall) }
             item { Divider() }
             items(si.racun.stavke) { s ->
-                Row {
-                    Text("${s.naziv} (${s.kolicina.toPlainString()}×${FiskalFormat.amount(s.jedinicnaCijena)})", Modifier.weight(1f))
-                    Text("${FiskalFormat.amount(s.ukupno)} €")
+                Column {
+                    Row {
+                        Text(s.naziv, Modifier.weight(1f))
+                        Text("${FiskalFormat.amount(s.ukupno)} €")
+                    }
+                    if (si.racun.zaglavlje.uSustavuPdv) {
+                        Text(
+                            "neto ${FiskalFormat.amount(s.neto)} · PDV ${FiskalFormat.amount(s.pdvStopa)}% = ${FiskalFormat.amount(s.pdvIznos)}",
+                            style = MaterialTheme.typography.bodySmall,
+                        )
+                    }
                 }
             }
             item {

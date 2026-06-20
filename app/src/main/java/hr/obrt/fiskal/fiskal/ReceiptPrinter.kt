@@ -48,11 +48,22 @@ object ReceiptPrinter {
         val datum = SimpleDateFormat("dd.MM.yyyy HH:mm:ss", Locale.ROOT).format(r.datVrijeme)
         val brojRacuna = "${r.brOznRac}/${z.oznPosPr}/${z.oznNapUr}"
 
+        val stavkeHeader = if (z.uSustavuPdv) {
+            "<tr><th>Naziv</th><th class=\"r\">Neto</th><th class=\"r\">PDV</th><th class=\"r\">Ukupno</th></tr>"
+        } else {
+            "<tr><th>Naziv</th><th class=\"r\">Kol.</th><th class=\"r\">Iznos</th></tr>"
+        }
         val stavkeRedovi = r.stavke.joinToString("") { s ->
-            "<tr><td>${esc(s.naziv)}</td>" +
-                "<td class='r'>${s.kolicina.toPlainString()}</td>" +
-                "<td class='r'>${FiskalFormat.amount(s.jedinicnaCijena)}</td>" +
-                "<td class='r'>${FiskalFormat.amount(s.ukupno)}</td></tr>"
+            if (z.uSustavuPdv) {
+                "<tr><td>${esc(s.naziv)}</td>" +
+                    "<td class='r'>${FiskalFormat.amount(s.neto)}</td>" +
+                    "<td class='r'>${FiskalFormat.amount(s.pdvIznos)}</td>" +
+                    "<td class='r'>${FiskalFormat.amount(s.ukupno)}</td></tr>"
+            } else {
+                "<tr><td>${esc(s.naziv)}</td>" +
+                    "<td class='r'>${s.kolicina.toPlainString()}</td>" +
+                    "<td class='r'>${FiskalFormat.amount(s.ukupno)}</td></tr>"
+            }
         }
 
         val pdvBlok = if (z.uSustavuPdv) {
@@ -95,7 +106,7 @@ object ReceiptPrinter {
               <div><b>Operater:</b> ${esc(z.oibOper)}</div>
               <div class="line"></div>
               <table>
-                <tr><th>Naziv</th><th class="r">Kol.</th><th class="r">Cijena</th><th class="r">Iznos</th></tr>
+                $stavkeHeader
                 $stavkeRedovi
               </table>
               <div class="total">UKUPNO: ${FiskalFormat.amount(r.iznosUkupno)} EUR</div>

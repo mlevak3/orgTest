@@ -51,8 +51,10 @@ data class SavedInvoice(
             arr.put(JSONObject().apply {
                 put("naziv", s.naziv)
                 put("kolicina", s.kolicina.toPlainString())
-                put("jedinicnaCijena", s.jedinicnaCijena.toPlainString())
                 put("pdvStopa", s.pdvStopa.toPlainString())
+                put("neto", s.neto.toPlainString())
+                put("pdvIznos", s.pdvIznos.toPlainString())
+                put("ukupno", s.ukupno.toPlainString())
             })
         }
         put("stavke", arr)
@@ -74,8 +76,10 @@ data class SavedInvoice(
                 Stavka(
                     naziv = s.optString("naziv"),
                     kolicina = BigDecimal(s.optString("kolicina", "0")),
-                    jedinicnaCijena = BigDecimal(s.optString("jedinicnaCijena", "0")),
                     pdvStopa = BigDecimal(s.optString("pdvStopa", "0")),
+                    neto = BigDecimal(s.optString("neto", "0")),
+                    pdvIznos = BigDecimal(s.optString("pdvIznos", "0")),
+                    ukupno = BigDecimal(s.optString("ukupno", "0")),
                 )
             }
             val racun = Racun(
