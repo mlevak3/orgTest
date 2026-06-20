@@ -13,6 +13,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
@@ -237,6 +238,13 @@ private fun ResultView(vm: AppViewModel, modifier: Modifier) {
                     modifier = Modifier.weight(1f),
                 ) { Text("Email") }
             }
+        }
+        item {
+            val uriHandler = LocalUriHandler.current
+            OutlinedButton(
+                onClick = { runCatching { uriHandler.openUri(ishod.qrUrl) } },
+                modifier = Modifier.fillMaxWidth(),
+            ) { Text("Provjeri na Poreznoj") }
         }
         item {
             OutlinedButton(onClick = { vm.resetRacun() }, modifier = Modifier.fillMaxWidth()) {

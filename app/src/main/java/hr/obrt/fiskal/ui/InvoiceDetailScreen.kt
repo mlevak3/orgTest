@@ -11,6 +11,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import hr.obrt.fiskal.fiskal.FiskalFormat
@@ -68,6 +69,13 @@ fun InvoiceDetailScreen(vm: AppViewModel, onBack: () -> Unit) {
                     Button(onClick = { ReceiptPrinter.print(ctx, data) }, modifier = Modifier.weight(1f)) { Text("Ispiši / PDF") }
                     Button(onClick = { InvoiceShare.emailPdf(ctx, data) }, modifier = Modifier.weight(1f)) { Text("Email") }
                 }
+            }
+            item {
+                val uriHandler = LocalUriHandler.current
+                OutlinedButton(
+                    onClick = { runCatching { uriHandler.openUri(si.qrUrl) } },
+                    modifier = Modifier.fillMaxWidth(),
+                ) { Text("Provjeri na Poreznoj") }
             }
             item {
                 OutlinedButton(
