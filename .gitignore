@@ -14,6 +14,8 @@ local.properties
 *.pfx
 *.jks
 *.keystore
+# iznimka: stalni ključ za potpis APK-a (osobna upotreba, da nadogradnje čuvaju podatke)
+!app/keystore/fiskal.jks
 
 # OS
 .DS_Store

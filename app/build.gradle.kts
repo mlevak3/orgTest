@@ -16,8 +16,23 @@ android {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
+    signingConfigs {
+        // Stalni ključ → nadogradnje se instaliraju preko stare verzije bez
+        // gubitka spremljenih tvrtki, certifikata i povijesti.
+        create("app") {
+            storeFile = file("keystore/fiskal.jks")
+            storePassword = "fiskalobrt"
+            keyAlias = "fiskal"
+            keyPassword = "fiskalobrt"
+        }
+    }
+
     buildTypes {
+        debug {
+            signingConfig = signingConfigs.getByName("app")
+        }
         release {
+            signingConfig = signingConfigs.getByName("app")
             isMinifyEnabled = false
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
