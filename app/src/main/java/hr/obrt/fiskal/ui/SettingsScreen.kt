@@ -14,6 +14,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
+import hr.obrt.fiskal.data.Tvrtka
 import hr.obrt.fiskal.fiskal.FiskalCertificate
 import hr.obrt.fiskal.fiskal.FiskalOkolina
 import hr.obrt.fiskal.fiskal.TlsTrust
@@ -21,69 +22,73 @@ import hr.obrt.fiskal.model.OznSlijed
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun SettingsScreen(vm: AppViewModel, onBack: () -> Unit) {
+fun SettingsScreen(vm: AppViewModel, onClose: () -> Unit) {
     val ctx = LocalContext.current
-    val repo = vm.repo
+    val store = vm.companyStore
+    val company = remember { vm.editing.value ?: Tvrtka().also { vm.editing.value = it } }
+    val postoji = vm.companies.any { it.id == company.id }
 
-    var oib by remember { mutableStateOf(repo.oib) }
-    var pdv by remember { mutableStateOf(repo.uSustavuPdv) }
-    var posPr by remember { mutableStateOf(repo.oznPosPr) }
-    var napUr by remember { mutableStateOf(repo.oznNapUr) }
-    var slijed by remember { mutableStateOf(repo.oznSlijed) }
-    var oper by remember { mutableStateOf(repo.oibOper) }
-    var okolina by remember { mutableStateOf(repo.okolina) }
-    var ignoreTls by remember { mutableStateOf(repo.ignoreTlsTrust) }
-    var lozinka by remember { mutableStateOf(repo.certPassword) }
-    var broj by remember { mutableStateOf(repo.sljedeciBroj.toString()) }
-    var certInfo by remember { mutableStateOf(certStatus(repo.certifikatPostoji())) }
-    var caInfo by remember { mutableStateOf(caStatus(repo.caPostoji())) }
+    var naziv by remember { mutableStateOf(company.naziv) }
+    var oib by remember { mutableStateOf(company.oib) }
+    var pdv by remember { mutableStateOf(company.uSustavuPdv) }
+    var posPr by remember { mutableStateOf(company.oznPosPr) }
+    var napUr by remember { mutableStateOf(company.oznNapUr) }
+    var slijed by remember { mutableStateOf(company.oznSlijed) }
+    var oper by remember { mutableStateOf(company.oibOper) }
+    var okolina by remember { mutableStateOf(company.okolina) }
+    var ignoreTls by remember { mutableStateOf(company.ignoreTls) }
+    var lozinka by remember { mutableStateOf(store.lozinka(company.id)) }
+    var broj by remember { mutableStateOf(company.sljedeciBroj.toString()) }
+    var certInfo by remember { mutableStateOf(certStatus(store.certPostoji(company.id))) }
+    var caInfo by remember { mutableStateOf(caStatus(store.caPostoji(company.id))) }
     var poruka by remember { mutableStateOf<String?>(null) }
 
-    val picker = rememberLauncherForActivityResult(
-        ActivityResultContracts.OpenDocument()
-    ) { uri ->
-        if (uri != null) {
-            runCatching {
-                val bytes = ctx.contentResolver.openInputStream(uri)!!.use { it.readBytes() }
-                repo.spremiCertifikat(bytes)
-                certInfo = certStatus(true)
-                poruka = "Certifikat učitan (${bytes.size} B). Unesi lozinku i spremi."
-            }.onFailure { poruka = "Greška pri učitavanju: ${it.message}" }
-        }
+    val certPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        if (uri != null) runCatching {
+            val bytes = ctx.contentResolver.openInputStream(uri)!!.use { it.readBytes() }
+            store.spremiCert(company.id, bytes)
+            certInfo = certStatus(true)
+            poruka = "Certifikat učitan (${bytes.size} B). Unesi lozinku i spremi."
+        }.onFailure { poruka = "Greška pri učitavanju: ${it.message}" }
+    }
+    val caPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        if (uri != null) runCatching {
+            val bytes = ctx.contentResolver.openInputStream(uri)!!.use { it.readBytes() }
+            val certs = TlsTrust.parseCertificates(bytes.inputStream())
+            require(certs.isNotEmpty()) { "Datoteka ne sadrži X.509 certifikate." }
+            store.spremiCa(company.id, bytes)
+            caInfo = "Status: učitano (${certs.size} certifikat/a)."
+            poruka = "FINA CA učitan."
+        }.onFailure { poruka = "Greška pri učitavanju CA: ${it.message}" }
     }
 
-    val caPicker = rememberLauncherForActivityResult(
-        ActivityResultContracts.OpenDocument()
-    ) { uri ->
-        if (uri != null) {
-            runCatching {
-                val bytes = ctx.contentResolver.openInputStream(uri)!!.use { it.readBytes() }
-                val certs = TlsTrust.parseCertificates(bytes.inputStream())
-                require(certs.isNotEmpty()) { "Datoteka ne sadrži X.509 certifikate." }
-                repo.spremiCa(bytes)
-                caInfo = "Status: učitano (${certs.size} certifikat/a)."
-                poruka = "FINA CA učitan (${certs.size} certifikat/a)."
-            }.onFailure { poruka = "Greška pri učitavanju CA: ${it.message}" }
-        }
+    fun spremi() {
+        store.postaviLozinku(company.id, lozinka)
+        val azurirana = company.copy(
+            naziv = naziv, oib = oib, uSustavuPdv = pdv, oznPosPr = posPr, oznNapUr = napUr,
+            oznSlijed = slijed, oibOper = oper, okolina = okolina, ignoreTls = ignoreTls,
+            sljedeciBroj = broj.toLongOrNull() ?: 1L,
+        )
+        vm.saveCompany(azurirana)
+        onClose()
     }
 
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Postavke") },
-                navigationIcon = { TextButton(onClick = onBack) { Text("Natrag") } },
+                title = { Text(if (postoji) "Uredi tvrtku" else "Nova tvrtka") },
+                navigationIcon = { TextButton(onClick = onClose) { Text("Odustani") } },
             )
         }
     ) { pad ->
         Column(
-            Modifier
-                .padding(pad)
-                .padding(16.dp)
-                .verticalScroll(rememberScrollState()),
+            Modifier.padding(pad).padding(16.dp).verticalScroll(rememberScrollState()),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            Text("Podaci obveznika", style = MaterialTheme.typography.titleMedium)
-
+            OutlinedTextField(
+                value = naziv, onValueChange = { naziv = it },
+                label = { Text("Naziv tvrtke / obrta") }, modifier = Modifier.fillMaxWidth(),
+            )
             OutlinedTextField(
                 value = oib, onValueChange = { oib = it.filter(Char::isDigit).take(11) },
                 label = { Text("OIB obveznika (11 znamenki)") },
@@ -92,47 +97,37 @@ fun SettingsScreen(vm: AppViewModel, onBack: () -> Unit) {
             )
             OutlinedTextField(
                 value = oper, onValueChange = { oper = it.filter(Char::isDigit).take(11) },
-                label = { Text("OIB operatera (ako je različit od obveznika)") },
+                label = { Text("OIB operatera (ako je različit)") },
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                 modifier = Modifier.fillMaxWidth(),
             )
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Switch(checked = pdv, onCheckedChange = { pdv = it })
-                Spacer(Modifier.width(8.dp))
-                Text("Obveznik u sustavu PDV-a")
+                Spacer(Modifier.width(8.dp)); Text("Obveznik u sustavu PDV-a")
             }
 
+            Divider()
             Text("Poslovni prostor", style = MaterialTheme.typography.titleMedium)
             OutlinedTextField(
                 value = posPr, onValueChange = { posPr = it },
-                label = { Text("Oznaka poslovnog prostora (OznPosPr)") },
-                modifier = Modifier.fillMaxWidth(),
+                label = { Text("Oznaka poslovnog prostora (OznPosPr)") }, modifier = Modifier.fillMaxWidth(),
             )
             OutlinedTextField(
                 value = napUr, onValueChange = { napUr = it },
-                label = { Text("Oznaka naplatnog uređaja (OznNapUr)") },
-                modifier = Modifier.fillMaxWidth(),
+                label = { Text("Oznaka naplatnog uređaja (OznNapUr)") }, modifier = Modifier.fillMaxWidth(),
             )
-            EnumRedak(
-                naslov = "Oznaka slijednosti",
-                opcije = OznSlijed.entries.map { it to it.opis },
-                odabrano = slijed,
-                naOdabir = { slijed = it },
-            )
+            EnumRedak("Oznaka slijednosti", OznSlijed.entries.map { it to it.opis }, slijed) { slijed = it }
 
             Divider()
             Text("FINA certifikat (.p12 / .pfx)", style = MaterialTheme.typography.titleMedium)
             Text(certInfo, style = MaterialTheme.typography.bodySmall)
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Button(onClick = {
-                    picker.launch(arrayOf("application/x-pkcs12", "application/octet-stream", "*/*"))
-                }) { Text("Učitaj certifikat") }
-                if (repo.certifikatPostoji()) {
-                    OutlinedButton(onClick = {
-                        repo.obrisiCertifikat(); certInfo = certStatus(false); lozinka = ""
-                        poruka = "Certifikat obrisan."
-                    }) { Text("Ukloni") }
+                Button(onClick = { certPicker.launch(arrayOf("application/x-pkcs12", "application/octet-stream", "*/*")) }) {
+                    Text("Učitaj certifikat")
                 }
+                if (store.certPostoji(company.id)) OutlinedButton(onClick = {
+                    store.obrisiCert(company.id); certInfo = certStatus(false); lozinka = ""
+                }) { Text("Ukloni") }
             }
             OutlinedTextField(
                 value = lozinka, onValueChange = { lozinka = it },
@@ -143,36 +138,26 @@ fun SettingsScreen(vm: AppViewModel, onBack: () -> Unit) {
             )
 
             Divider()
-            Text("FINA CA certifikat (TLS — za PRODUKCIJU)", style = MaterialTheme.typography.titleMedium)
+            Text("FINA CA (TLS — za PRODUKCIJU)", style = MaterialTheme.typography.titleMedium)
             Text(caInfo, style = MaterialTheme.typography.bodySmall)
             Text(
-                "Rješava grešku Trust anchor not found. Skini s fina.hr (CA certifikati) " +
-                    "Fina Root CA i Fina RDC 2020 CA (PEM ili DER) pa ih učitaj ovdje. " +
-                    "Možeš učitati i jednu PEM datoteku s oba certifikata.",
+                "Fina Root CA + Fina RDC 2020 su već ugrađeni; uvezi samo ako FINA promijeni lanac.",
                 style = MaterialTheme.typography.bodySmall,
             )
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Button(onClick = { caPicker.launch(arrayOf("*/*")) }) { Text("Učitaj CA") }
-                if (repo.caPostoji()) {
-                    OutlinedButton(onClick = {
-                        repo.obrisiCa(); caInfo = caStatus(false); poruka = "FINA CA uklonjen."
-                    }) { Text("Ukloni") }
-                }
+                if (store.caPostoji(company.id)) OutlinedButton(onClick = {
+                    store.obrisiCa(company.id); caInfo = caStatus(false)
+                }) { Text("Ukloni") }
             }
 
             Divider()
             Text("Okolina i numeracija", style = MaterialTheme.typography.titleMedium)
-            EnumRedak(
-                naslov = "Okolina",
-                opcije = FiskalOkolina.entries.map { it to it.opis },
-                odabrano = okolina,
-                naOdabir = { okolina = it },
-            )
+            EnumRedak("Okolina", FiskalOkolina.entries.map { it to it.opis }, okolina) { okolina = it }
             if (okolina == FiskalOkolina.TEST) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Switch(checked = ignoreTls, onCheckedChange = { ignoreTls = it })
-                    Spacer(Modifier.width(8.dp))
-                    Text("Zanemari TLS provjeru (samo TEST poslužitelj)")
+                    Spacer(Modifier.width(8.dp)); Text("Zanemari TLS provjeru (samo TEST)")
                 }
             }
             OutlinedTextField(
@@ -182,32 +167,33 @@ fun SettingsScreen(vm: AppViewModel, onBack: () -> Unit) {
                 modifier = Modifier.fillMaxWidth(),
             )
 
-            poruka?.let {
-                Text(it, color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.bodySmall)
-            }
+            poruka?.let { Text(it, color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.bodySmall) }
 
             Button(
                 onClick = {
-                    repo.oib = oib; repo.uSustavuPdv = pdv; repo.oznPosPr = posPr
-                    repo.oznNapUr = napUr; repo.oznSlijed = slijed; repo.oibOper = oper
-                    repo.okolina = okolina; repo.ignoreTlsTrust = ignoreTls
-                    repo.certPassword = lozinka
-                    repo.sljedeciBroj = broj.toLongOrNull() ?: 1L
-
-                    // Pokušaj validacije certifikata + lozinke radi rane povratne informacije.
-                    val info = if (repo.certifikatPostoji() && lozinka.isNotBlank()) {
+                    store.postaviLozinku(company.id, lozinka)
+                    val info = if (store.certPostoji(company.id) && lozinka.isNotBlank()) {
                         runCatching {
-                            FiskalCertificate.load(repo.certifikatBytes()!!.inputStream(), lozinka.toCharArray())
+                            FiskalCertificate.load(store.certBytes(company.id)!!.inputStream(), lozinka.toCharArray())
                         }.fold(
-                            onSuccess = { "Spremljeno. Certifikat OK (OIB iz cert.: ${it.oibIzCertifikata ?: "?"})." },
-                            onFailure = { "Spremljeno, ALI certifikat/lozinka neispravni: ${it.message}" },
+                            onSuccess = { "Certifikat OK (OIB iz cert.: ${it.oibIzCertifikata ?: "?"})." },
+                            onFailure = { "Certifikat/lozinka neispravni: ${it.message}" },
                         )
-                    } else "Spremljeno."
+                    } else null
                     poruka = info
                 },
                 modifier = Modifier.fillMaxWidth(),
-            ) { Text("Spremi postavke") }
+            ) { Text("Provjeri certifikat") }
 
+            Button(onClick = { spremi() }, modifier = Modifier.fillMaxWidth()) { Text("Spremi tvrtku") }
+
+            if (postoji) {
+                OutlinedButton(
+                    onClick = { vm.deleteCompany(company); onClose() },
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error),
+                ) { Text("Obriši tvrtku") }
+            }
             Spacer(Modifier.height(24.dp))
         }
     }
@@ -217,24 +203,15 @@ private fun certStatus(postoji: Boolean) =
     if (postoji) "Status: certifikat učitan." else "Status: certifikat NIJE učitan."
 
 private fun caStatus(postoji: Boolean) =
-    if (postoji) "Status: FINA CA učitan." else "Status: FINA CA NIJE učitan."
+    if (postoji) "Status: FINA CA učitan." else "Status: koristi se ugrađeni FINA CA."
 
 @Composable
-private fun <T> EnumRedak(
-    naslov: String,
-    opcije: List<Pair<T, String>>,
-    odabrano: T,
-    naOdabir: (T) -> Unit,
-) {
+private fun <T> EnumRedak(naslov: String, opcije: List<Pair<T, String>>, odabrano: T, naOdabir: (T) -> Unit) {
     Column {
         Text(naslov, style = MaterialTheme.typography.labelLarge)
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             opcije.forEach { (vrijednost, opis) ->
-                FilterChip(
-                    selected = odabrano == vrijednost,
-                    onClick = { naOdabir(vrijednost) },
-                    label = { Text(opis) },
-                )
+                FilterChip(selected = odabrano == vrijednost, onClick = { naOdabir(vrijednost) }, label = { Text(opis) })
             }
         }
     }

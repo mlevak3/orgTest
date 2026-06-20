@@ -18,21 +18,32 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import hr.obrt.fiskal.fiskal.FiskalRezultat
+import hr.obrt.fiskal.fiskal.InvoiceShare
 import hr.obrt.fiskal.fiskal.QrRenderer
 import hr.obrt.fiskal.fiskal.ReceiptPrinter
 import hr.obrt.fiskal.model.NacinPlac
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun InvoiceScreen(vm: AppViewModel, onSettings: () -> Unit) {
+fun InvoiceScreen(
+    vm: AppViewModel,
+    onCompanies: () -> Unit,
+    onHistory: () -> Unit,
+    onSettings: () -> Unit,
+) {
     val ishod = vm.ishod.value
     val ucitavanje = vm.ucitavanje.value
+    val tvrtka = vm.selected.value
 
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Fiskalizacija računa") },
-                actions = { TextButton(onClick = onSettings) { Text("Postavke") } },
+                title = { Text(tvrtka?.opis() ?: "Fiskalizacija") },
+                navigationIcon = { TextButton(onClick = onCompanies) { Text("Tvrtke") } },
+                actions = {
+                    TextButton(onClick = onHistory) { Text("Računi") }
+                    TextButton(onClick = onSettings) { Text("Postavke") }
+                },
             )
         }
     ) { pad ->
@@ -49,8 +60,8 @@ fun InvoiceScreen(vm: AppViewModel, onSettings: () -> Unit) {
         ) {
             item {
                 Text(
-                    "Okolina: ${vm.repo.okolina.opis} · Račun br. ${vm.repo.sljedeciBroj}/" +
-                        "${vm.repo.oznPosPr}/${vm.repo.oznNapUr}",
+                    "Okolina: ${tvrtka?.okolina?.opis ?: "—"} · Račun br. " +
+                        "${tvrtka?.sljedeciBroj ?: 0}/${tvrtka?.oznPosPr ?: ""}/${tvrtka?.oznNapUr ?: ""}",
                     style = MaterialTheme.typography.bodySmall,
                 )
             }
@@ -147,7 +158,7 @@ private fun StavkaRedak(vm: AppViewModel, index: Int) {
                     singleLine = true,
                     modifier = Modifier.weight(1f),
                 )
-                if (vm.repo.uSustavuPdv) {
+                if (vm.selected.value?.uSustavuPdv == true) {
                     OutlinedTextField(
                         value = s.pdvStopa,
                         onValueChange = { vm.azurirajStavku(index, s.copy(pdvStopa = it)) },
@@ -193,10 +204,17 @@ private fun ResultView(vm: AppViewModel, modifier: Modifier) {
         }
         item {
             val ctx = LocalContext.current
-            Button(
-                onClick = { ReceiptPrinter.print(ctx, ishod) },
-                modifier = Modifier.fillMaxWidth(),
-            ) { Text("Ispiši / spremi PDF") }
+            val data = vm.receiptFromIshod()
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Button(
+                    onClick = { data?.let { ReceiptPrinter.print(ctx, it) } },
+                    modifier = Modifier.weight(1f),
+                ) { Text("Ispiši / PDF") }
+                Button(
+                    onClick = { data?.let { InvoiceShare.emailPdf(ctx, it) } },
+                    modifier = Modifier.weight(1f),
+                ) { Text("Email") }
+            }
         }
         item {
             OutlinedButton(onClick = { vm.resetRacun() }, modifier = Modifier.fillMaxWidth()) {

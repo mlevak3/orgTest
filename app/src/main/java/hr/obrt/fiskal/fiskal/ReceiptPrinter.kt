@@ -19,16 +19,16 @@ object ReceiptPrinter {
     // Zadržavamo referencu da WebView ne bude počišćen prije završetka ispisa.
     private var webViewRef: WebView? = null
 
-    fun print(context: Context, ishod: FiskalIshod) {
-        val qrBitmap = QrRenderer.toBitmap(ishod.qrUrl, size = 480)
+    fun print(context: Context, data: ReceiptData) {
+        val qrBitmap = QrRenderer.toBitmap(data.qrUrl, size = 480)
         val qrBase64 = QrRenderer.toBase64Png(qrBitmap)
-        val html = buildHtml(ishod, qrBase64)
+        val html = buildHtml(data, qrBase64)
 
         val webView = WebView(context)
         webView.webViewClient = object : WebViewClient() {
             override fun onPageFinished(view: WebView, url: String?) {
                 val printManager = context.getSystemService(Context.PRINT_SERVICE) as PrintManager
-                val jobName = "Racun-${ishod.racun.brOznRac}-${ishod.racun.zaglavlje.oznPosPr}"
+                val jobName = "Racun-${data.racun.brOznRac}-${data.racun.zaglavlje.oznPosPr}"
                 val adapter = view.createPrintDocumentAdapter(jobName)
                 printManager.print(
                     jobName,
@@ -42,8 +42,8 @@ object ReceiptPrinter {
         webView.loadDataWithBaseURL(null, html, "text/html", "UTF-8", null)
     }
 
-    private fun buildHtml(ishod: FiskalIshod, qrBase64: String): String {
-        val r = ishod.racun
+    private fun buildHtml(data: ReceiptData, qrBase64: String): String {
+        val r = data.racun
         val z = r.zaglavlje
         val datum = SimpleDateFormat("dd.MM.yyyy HH:mm:ss", Locale.ROOT).format(r.datVrijeme)
         val brojRacuna = "${r.brOznRac}/${z.oznPosPr}/${z.oznNapUr}"
@@ -66,7 +66,7 @@ object ReceiptPrinter {
             "<p class='note'>Obveznik nije u sustavu PDV-a.</p>"
         }
 
-        val jirRedak = ishod.jir?.let { "<div><b>JIR:</b> ${esc(it)}</div>" }
+        val jirRedak = data.jir?.let { "<div><b>JIR:</b> ${esc(it)}</div>" }
             ?: "<div class='warn'><b>JIR:</b> nije dodijeljen (naknadna dostava)</div>"
 
         return """
@@ -88,6 +88,7 @@ object ReceiptPrinter {
               .foot { text-align: center; font-size: 10px; margin-top: 8px; }
             </style></head><body>
               <h1>RAČUN</h1>
+              <div style="text-align:center;font-weight:bold">${esc(data.naslovTvrtke)}</div>
               <div><b>OIB:</b> ${esc(z.oib)}</div>
               <div><b>Broj računa:</b> ${esc(brojRacuna)}</div>
               <div><b>Datum:</b> $datum</div>
@@ -102,7 +103,7 @@ object ReceiptPrinter {
               <div><b>Način plaćanja:</b> ${r.nacinPlac.opis}</div>
               <div class="line"></div>
               $jirRedak
-              <div class="codes"><b>ZKI:</b> ${esc(ishod.zki)}</div>
+              <div class="codes"><b>ZKI:</b> ${esc(data.zki)}</div>
               <div class="qr"><img src="data:image/png;base64,$qrBase64" alt="QR"></div>
               <div class="foot">Provjera računa: porezna.gov.hr/rn</div>
             </body></html>
