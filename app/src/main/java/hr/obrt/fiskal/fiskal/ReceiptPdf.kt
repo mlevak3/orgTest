@@ -26,10 +26,14 @@ object ReceiptPdf {
         val title = Paint().apply { textSize = 18f; isFakeBoldText = true; isAntiAlias = true }
         val bold = Paint().apply { textSize = 11f; isFakeBoldText = true; typeface = Typeface.MONOSPACE; isAntiAlias = true }
         val normal = Paint().apply { textSize = 11f; typeface = Typeface.MONOSPACE; isAntiAlias = true }
+        val tiny = Paint().apply { textSize = 8f; typeface = Typeface.MONOSPACE; isAntiAlias = true }
 
+        val tinyH = 11f
+        val urlLines = wrap(data.qrUrl, tiny, pageWidth - 2 * margin)
         val pdvBroj = if (z.uSustavuPdv) r.pdvGrupe().size + 1 else 1
         val brojLinija = 6 + 1 + 1 + r.stavke.size + 1 + pdvBroj + 1 + 1 + 1 + 1
-        val height = (margin * 2 + brojLinija * lineH + 12 + qrSize + 24).toInt()
+        val height = (margin * 2 + brojLinija * lineH + 12 + qrSize + 8 +
+            (1 + urlLines.size) * tinyH + 16).toInt()
 
         val doc = PdfDocument()
         val page = doc.startPage(PdfDocument.PageInfo.Builder(pageWidth, height, 1).create())
@@ -77,6 +81,10 @@ object ReceiptPdf {
 
         val qr = QrRenderer.toBitmap(data.qrUrl, qrSize)
         c.drawBitmap(Bitmap.createScaledBitmap(qr, qrSize, qrSize, false), (pageWidth - qrSize) / 2f, y + 4f, null)
+        y += qrSize + 12f
+
+        c.drawText("QR poveznica (provjera računa):", margin, y, tiny); y += tinyH
+        urlLines.forEach { c.drawText(it, margin, y, tiny); y += tinyH }
 
         doc.finishPage(page)
 
@@ -84,5 +92,20 @@ object ReceiptPdf {
         file.outputStream().use { doc.writeTo(it) }
         doc.close()
         return file
+    }
+
+    /** Prelama tekst u retke koji stanu u zadanu širinu. */
+    private fun wrap(text: String, paint: Paint, maxWidth: Float): List<String> {
+        val lines = mutableListOf<String>()
+        var start = 0
+        while (start < text.length) {
+            var end = start + 1
+            while (end < text.length && paint.measureText(text.substring(start, end + 1)) <= maxWidth) {
+                end++
+            }
+            lines.add(text.substring(start, end))
+            start = end
+        }
+        return lines
     }
 }

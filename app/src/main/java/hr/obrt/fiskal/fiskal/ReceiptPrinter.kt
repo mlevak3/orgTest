@@ -105,6 +105,7 @@ object ReceiptPrinter {
               $jirRedak
               <div class="codes"><b>ZKI:</b> ${esc(data.zki)}</div>
               <div class="qr"><img src="data:image/png;base64,$qrBase64" alt="QR"></div>
+              <div class="codes" style="font-size:9px;text-align:center"><b>QR poveznica:</b> ${esc(data.qrUrl)}</div>
               <div class="foot">Provjera računa: porezna.gov.hr/rn</div>
             </body></html>
         """.trimIndent()
