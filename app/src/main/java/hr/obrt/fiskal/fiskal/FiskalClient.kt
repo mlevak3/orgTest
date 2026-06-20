@@ -20,11 +20,20 @@ enum class FiskalOkolina(val url: String, val opis: String) {
 
 /** Rezultat fiskalizacije računa. */
 sealed interface FiskalRezultat {
+    /** Račun je fiskaliziran — CIS je vratio JIR. */
     data class Uspjeh(val jir: String) : FiskalRezultat
-    /** Greška koju je vratio CIS (npr. s002 — neispravan potpis). */
+
+    /** CIS je odbio račun s poslovnom greškom (npr. s002 — neispravan potpis). */
     data class Greska(val sifra: String, val poruka: String) : FiskalRezultat
-    /** Mrežna/TLS/ostala lokalna greška. */
-    data class Iznimka(val poruka: String) : FiskalRezultat
+
+    /**
+     * Odgovor je primljen, ali JIR nije pročitan. Račun je MOŽDA fiskaliziran —
+     * obavezno provjeriti (ZKI na porezna.gov.hr) prije ponovne fiskalizacije.
+     */
+    data class Neizvjesno(val poruka: String, val rawOdgovor: String) : FiskalRezultat
+
+    /** Zahtjev nije ni poslan (nema veze, TLS, timeout) ili nema odgovora — sigurno NIJE fiskaliziran. */
+    data class Mreza(val poruka: String) : FiskalRezultat
 }
 
 /**
@@ -42,65 +51,87 @@ class FiskalClient(
     private val http: OkHttpClient by lazy { buildClient() }
 
     fun posalji(soapEnvelope: String): FiskalRezultat {
-        return try {
-            val body = soapEnvelope.toRequestBody(XML_MEDIA)
-            val request = Request.Builder()
-                .url(okolina.url)
-                .addHeader("Content-Type", "text/xml; charset=UTF-8")
-                .addHeader("SOAPAction", "")
-                .post(body)
-                .build()
+        val request = Request.Builder()
+            .url(okolina.url)
+            .addHeader("Content-Type", "text/xml; charset=UTF-8")
+            .addHeader("SOAPAction", "")
+            .post(soapEnvelope.toRequestBody(XML_MEDIA))
+            .build()
 
-            http.newCall(request).execute().use { resp ->
-                val text = resp.body?.string().orEmpty()
-                parse(text)
-            }
+        // Mrežni sloj: ako ovdje pukne, zahtjev nije obrađen → sigurno nije fiskalizirano.
+        val resp = try {
+            http.newCall(request).execute()
         } catch (e: Exception) {
-            FiskalRezultat.Iznimka(e.message ?: e.javaClass.simpleName)
+            return FiskalRezultat.Mreza(opisMrezne(e))
+        }
+
+        resp.use {
+            val code = it.code
+            val text = try { it.body?.string().orEmpty() } catch (e: Exception) {
+                return FiskalRezultat.Neizvjesno(
+                    "Odgovor je primljen (HTTP $code), ali se nije mogao pročitati: ${e.message}", "",
+                )
+            }
+            if (text.isBlank()) {
+                return if (code in 200..299)
+                    FiskalRezultat.Neizvjesno("Prazan odgovor poslužitelja (HTTP $code).", "")
+                else
+                    FiskalRezultat.Mreza("Poslužitelj je vratio HTTP $code bez sadržaja.")
+            }
+            return parse(text, code)
         }
     }
 
-    private fun parse(xml: String): FiskalRezultat {
-        if (xml.isBlank()) return FiskalRezultat.Iznimka("Prazan odgovor poslužitelja.")
-        return try {
+    private fun parse(xml: String, code: Int): FiskalRezultat {
+        // Prvo pokušaj urednog DOM parsiranja; svaki neuspjeh pada na rezervni regex.
+        runCatching {
             val dbf = DocumentBuilderFactory.newInstance().apply {
                 isNamespaceAware = true
-                // Sigurnosne postavke — neke verzije Android parsera ih ne podržavaju,
-                // pa ih postavljamo "best effort" (odgovor dolazi s pouzdanog TLS endpointa).
                 runCatching { setFeature("http://apache.org/xml/features/disallow-doctype-decl", true) }
                 runCatching { setFeature("http://xml.org/sax/features/external-general-entities", false) }
                 runCatching { setFeature("http://xml.org/sax/features/external-parameter-entities", false) }
                 runCatching { isExpandEntityReferences = false }
             }
-            val doc = dbf.newDocumentBuilder()
-                .parse(ByteArrayInputStream(xml.toByteArray(Charsets.UTF_8)))
+            val doc = dbf.newDocumentBuilder().parse(ByteArrayInputStream(xml.toByteArray(Charsets.UTF_8)))
 
             firstText(doc.documentElement, "Jir")?.let {
                 if (it.isNotBlank()) return FiskalRezultat.Uspjeh(it)
             }
-
-            val greska = firstElement(doc.documentElement, "Greska")
-            if (greska != null) {
-                val sifra = firstText(greska, "SifraGreske").orEmpty()
-                val poruka = firstText(greska, "PorukaGreske").orEmpty()
-                return FiskalRezultat.Greska(sifra, poruka)
+            firstElement(doc.documentElement, "Greska")?.let { g ->
+                return FiskalRezultat.Greska(
+                    firstText(g, "SifraGreske").orEmpty(),
+                    firstText(g, "PorukaGreske").orEmpty(),
+                )
             }
-
-            val fault = firstText(doc.documentElement, "faultstring")
-            if (fault != null) return FiskalRezultat.Greska("SOAP-Fault", fault)
-
-            FiskalRezultat.Iznimka("Neprepoznat odgovor:\n${xml.take(500)}")
-        } catch (e: Exception) {
-            // Rezervno: izvuci JIR/grešku regexom ako DOM parsiranje zakaže.
-            jirRegex.find(xml)?.groupValues?.get(1)?.takeIf { it.isNotBlank() }
-                ?.let { return FiskalRezultat.Uspjeh(it) }
-            val sifra = sifraRegex.find(xml)?.groupValues?.get(1)
-            val poruka = porukaRegex.find(xml)?.groupValues?.get(1)
-            if (sifra != null || poruka != null) {
-                return FiskalRezultat.Greska(sifra.orEmpty(), poruka.orEmpty())
+            firstText(doc.documentElement, "faultstring")?.let {
+                return FiskalRezultat.Greska("SOAP-Fault", it)
             }
-            FiskalRezultat.Iznimka("Greška pri čitanju odgovora: ${e.message}\n${xml.take(300)}")
         }
+
+        // Rezervno: izvuci JIR/grešku regexom čak i ako je XML neispravan.
+        jirRegex.find(xml)?.groupValues?.get(1)?.takeIf { it.isNotBlank() }
+            ?.let { return FiskalRezultat.Uspjeh(it) }
+        val sifra = sifraRegex.find(xml)?.groupValues?.get(1)
+        val poruka = porukaRegex.find(xml)?.groupValues?.get(1)
+        if (sifra != null || poruka != null) {
+            return FiskalRezultat.Greska(sifra.orEmpty(), poruka.orEmpty())
+        }
+
+        // Odgovor je stigao, ali JIR/grešku nismo prepoznali → NEIZVJESNO.
+        return FiskalRezultat.Neizvjesno(
+            "Odgovor primljen (HTTP $code) ali JIR nije prepoznat. Račun je MOŽDA fiskaliziran.",
+            xml.take(2000),
+        )
+    }
+
+    private fun opisMrezne(e: Exception): String = when (e) {
+        is javax.net.ssl.SSLHandshakeException ->
+            "TLS: certifikat poslužitelja nije prihvaćen (učitaj FINA CA u Postavkama). ${e.message}"
+        is javax.net.ssl.SSLException -> "TLS greška: ${e.message}"
+        is java.net.UnknownHostException -> "Nema internetske veze ili je poslužitelj nedostupan."
+        is java.net.SocketTimeoutException -> "Isteklo vrijeme čekanja (timeout). Pokušaj ponovno."
+        is java.net.ConnectException -> "Nije se moguće spojiti na poslužitelj fiskalizacije."
+        else -> e.message ?: e.javaClass.simpleName
     }
 
     private fun firstElement(root: Element, localName: String): Element? {

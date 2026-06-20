@@ -183,17 +183,39 @@ private fun ResultView(vm: AppViewModel, modifier: Modifier) {
         item {
             when (val r = ishod.rezultat) {
                 is FiskalRezultat.Uspjeh -> StatusKartica(
-                    naslov = "✓ Račun fiskaliziran",
+                    naslov = "✓ Račun je fiskaliziran (JIR dodijeljen).",
                     boja = MaterialTheme.colorScheme.secondary,
                 )
                 is FiskalRezultat.Greska -> StatusKartica(
-                    naslov = "✗ CIS greška: ${r.sifra}\n${r.poruka}",
+                    naslov = "✗ CIS je odbio račun.\nŠifra: ${r.sifra}\n${r.poruka}\n\n" +
+                        "Račun NIJE fiskaliziran. Ispravi i pokušaj ponovno.",
                     boja = MaterialTheme.colorScheme.error,
                 )
-                is FiskalRezultat.Iznimka -> StatusKartica(
-                    naslov = "⚠ Nije poslano: ${r.poruka}\nZKI je izračunat i mora se otisnuti (naknadna dostava).",
+                is FiskalRezultat.Neizvjesno -> StatusKartica(
+                    naslov = "⚠ NEIZVJESNO: ${r.poruka}\n\n" +
+                        "Odgovor je stigao, ali JIR nije pročitan. PRIJE ponovne fiskalizacije " +
+                        "provjeri ZKI (dolje) na porezna.gov.hr/rn — ako se račun nađe, fiskaliziran je.",
                     boja = MaterialTheme.colorScheme.error,
                 )
+                is FiskalRezultat.Mreza -> StatusKartica(
+                    naslov = "⚠ Nije poslano: ${r.poruka}\n\n" +
+                        "Račun nije stigao do CIS-a (sigurno NIJE fiskaliziran). " +
+                        "ZKI je izračunat; po potrebi otisni i naknadno dostavi.",
+                    boja = MaterialTheme.colorScheme.error,
+                )
+            }
+        }
+        (ishod.rezultat as? FiskalRezultat.Neizvjesno)?.let { r ->
+            if (r.rawOdgovor.isNotBlank()) item {
+                var prikaziRaw by remember { mutableStateOf(false) }
+                TextButton(onClick = { prikaziRaw = !prikaziRaw }) {
+                    Text(if (prikaziRaw) "Sakrij odgovor poslužitelja" else "Prikaži odgovor poslužitelja")
+                }
+                if (prikaziRaw) {
+                    androidx.compose.foundation.text.selection.SelectionContainer {
+                        Text(r.rawOdgovor, style = MaterialTheme.typography.bodySmall, fontFamily = FontFamily.Monospace)
+                    }
+                }
             }
         }
         item { Polje("JIR", ishod.jir ?: "— (nije dodijeljen)") }

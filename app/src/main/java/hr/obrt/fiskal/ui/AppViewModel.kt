@@ -123,7 +123,11 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         val t = selected.value ?: throw IllegalStateException("Nije odabrana tvrtka.")
         val bytes = companyStore.certBytes(t.id)
             ?: throw IllegalStateException("Certifikat nije učitan (Postavke tvrtke).")
-        val cert = FiskalCertificate.load(bytes.inputStream(), companyStore.lozinka(t.id).toCharArray())
+        val cert = try {
+            FiskalCertificate.load(bytes.inputStream(), companyStore.lozinka(t.id).toCharArray())
+        } catch (e: Exception) {
+            throw IllegalStateException("Ne mogu otvoriti certifikat — provjeri lozinku certifikata u Postavkama. (${e.message})")
+        }
         val caCerts = CaStore.loadExtraCas(getApplication(), companyStore.caBytes(t.id))
 
         val racun = Racun(
@@ -155,7 +159,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         val status = when (val r = ishod.rezultat) {
             is FiskalRezultat.Uspjeh -> "Fiskaliziran"
             is FiskalRezultat.Greska -> "CIS greška: ${r.sifra} ${r.poruka}"
-            is FiskalRezultat.Iznimka -> "Nije poslano: ${r.poruka}"
+            is FiskalRezultat.Neizvjesno -> "NEIZVJESNO — provjeri (možda fiskalizirano)"
+            is FiskalRezultat.Mreza -> "Nije poslano: ${r.poruka}"
         }
         invoiceStore.spremi(
             SavedInvoice(
