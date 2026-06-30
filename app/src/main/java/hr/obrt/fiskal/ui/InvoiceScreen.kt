@@ -31,7 +31,7 @@ import hr.obrt.fiskal.model.NacinPlac
 @Composable
 fun InvoiceScreen(
     vm: AppViewModel,
-    onCompanies: () -> Unit,
+    onHome: () -> Unit,
     onHistory: () -> Unit,
     onSettings: () -> Unit,
     onArticles: () -> Unit,
@@ -44,10 +44,19 @@ fun InvoiceScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text(tvrtka?.opis() ?: "Fiskalizacija", maxLines = 1) },
-                navigationIcon = { TextButton(onClick = onCompanies) { Text("Tvrtke") } },
+                title = { Text(if (ishod != null) "Račun fiskaliziran" else "Novi račun", maxLines = 1) },
+                navigationIcon = { TextButton(onClick = onHome) { Text("Početna") } },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = MaterialTheme.colorScheme.primary,
+                    titleContentColor = MaterialTheme.colorScheme.onPrimary,
+                    navigationIconContentColor = MaterialTheme.colorScheme.onPrimary,
+                    actionIconContentColor = MaterialTheme.colorScheme.onPrimary,
+                ),
                 actions = {
-                    TextButton(onClick = onHistory) { Text("Računi") }
+                    TextButton(
+                        onClick = onHistory,
+                        colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.onPrimary),
+                    ) { Text("Računi") }
                     IconButton(onClick = { meniOtvoren = true }) { Icon(Icons.Filled.MoreVert, "Izbornik") }
                     DropdownMenu(expanded = meniOtvoren, onDismissRequest = { meniOtvoren = false }) {
                         DropdownMenuItem(text = { Text("Šifrarnik artikala") }, onClick = { meniOtvoren = false; onArticles() })
@@ -136,25 +145,44 @@ private fun InvoiceForm(vm: AppViewModel, tvrtka: hr.obrt.fiskal.data.Tvrtka?, m
 private fun StavkaKartica(vm: AppViewModel, index: Int, pdv: Boolean) {
     val s = vm.stavke[index]
     ElevatedCard {
-        Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text("Stavka ${index + 1}", style = MaterialTheme.typography.labelLarge, modifier = Modifier.weight(1f))
-                Text("${s.ukupno.ifBlank { "0.00" }} €", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-                IconButton(onClick = { vm.ukloniStavku(index) }) { Icon(Icons.Filled.Delete, "Ukloni") }
+                Text(
+                    "Stavka ${index + 1}",
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.weight(1f),
+                )
+                IconButton(onClick = { vm.ukloniStavku(index) }) {
+                    Icon(Icons.Filled.Delete, "Ukloni", tint = MaterialTheme.colorScheme.error)
+                }
             }
             OutlinedTextField(
                 value = s.naziv, onValueChange = { vm.setNaziv(index, it) },
                 label = { Text("Naziv") }, singleLine = true, modifier = Modifier.fillMaxWidth(),
             )
-            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 Polje(s.kolicina, "Količina", Modifier.weight(1f)) { vm.setKolicina(index, it) }
-                Polje(s.jedCijena, if (pdv) "Cijena (neto)" else "Cijena", Modifier.weight(1.3f)) { vm.setJedCijena(index, it) }
-                if (pdv) Polje(s.pdvStopa, "PDV %", Modifier.weight(0.9f)) { vm.setStopa(index, it) }
+                Polje(s.jedCijena, if (pdv) "Cijena (neto)" else "Cijena", Modifier.weight(1f)) { vm.setJedCijena(index, it) }
             }
-            if (pdv) Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                Polje(s.neto, "Neto €", Modifier.weight(1f)) { vm.setNeto(index, it) }
-                Polje(s.pdvIznos, "PDV €", Modifier.weight(1f)) { vm.setPdvIznos(index, it) }
-                Polje(s.ukupno, "Ukupno €", Modifier.weight(1f)) { vm.setUkupno(index, it) }
+            if (pdv) {
+                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Polje(s.pdvStopa, "PDV %", Modifier.weight(1f)) { vm.setStopa(index, it) }
+                    Polje(s.neto, "Neto", Modifier.weight(1f)) { vm.setNeto(index, it) }
+                }
+                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Polje(s.pdvIznos, "PDV €", Modifier.weight(1f)) { vm.setPdvIznos(index, it) }
+                    Polje(s.ukupno, "Ukupno", Modifier.weight(1f)) { vm.setUkupno(index, it) }
+                }
+            }
+            Divider()
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text("Ukupno stavke", style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
+                Text(
+                    "${s.ukupno.ifBlank { "0.00" }} €",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold,
+                )
             }
         }
     }

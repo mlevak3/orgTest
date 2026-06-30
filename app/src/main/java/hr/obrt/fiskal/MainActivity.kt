@@ -2,6 +2,7 @@ package hr.obrt.fiskal
 
 import android.os.Bundle
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -12,12 +13,13 @@ import hr.obrt.fiskal.ui.AppViewModel
 import hr.obrt.fiskal.ui.ArticlesScreen
 import hr.obrt.fiskal.ui.CompanyListScreen
 import hr.obrt.fiskal.ui.HistoryScreen
+import hr.obrt.fiskal.ui.HomeScreen
 import hr.obrt.fiskal.ui.InvoiceDetailScreen
 import hr.obrt.fiskal.ui.InvoiceScreen
 import hr.obrt.fiskal.ui.SettingsScreen
 import hr.obrt.fiskal.ui.theme.FiskalTheme
 
-private enum class Screen { CompanyList, Settings, Invoice, History, Detail, Articles }
+private enum class Screen { CompanyList, Home, Settings, Invoice, History, Detail, Articles }
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -26,26 +28,43 @@ class MainActivity : ComponentActivity() {
             FiskalTheme {
                 val vm: AppViewModel = viewModel()
                 var screen by remember {
-                    mutableStateOf(if (vm.selected.value == null) Screen.CompanyList else Screen.Invoice)
+                    mutableStateOf(if (vm.selected.value == null) Screen.CompanyList else Screen.Home)
+                }
+
+                // Sustavski "natrag" vodi na početnu (osim na početnoj/odabiru tvrtke).
+                BackHandler(enabled = screen != Screen.Home && screen != Screen.CompanyList) {
+                    screen = when (screen) {
+                        Screen.Detail -> Screen.History
+                        else -> Screen.Home
+                    }
                 }
 
                 when (screen) {
                     Screen.CompanyList -> CompanyListScreen(
                         vm,
-                        onSelect = { vm.selectCompany(it); screen = Screen.Invoice },
+                        onSelect = { vm.selectCompany(it); screen = Screen.Home },
                         onAdd = { vm.newCompany(); screen = Screen.Settings },
                         onEdit = { vm.editCompany(it); screen = Screen.Settings },
-                        onBack = if (vm.selected.value != null) ({ screen = Screen.Invoice }) else null,
+                        onBack = if (vm.selected.value != null) ({ screen = Screen.Home }) else null,
+                    )
+
+                    Screen.Home -> HomeScreen(
+                        vm,
+                        onNewInvoice = { vm.resetRacun(); screen = Screen.Invoice },
+                        onHistory = { vm.loadHistory(); screen = Screen.History },
+                        onArticles = { vm.biranjeArtikla.value = false; vm.loadArticles(); screen = Screen.Articles },
+                        onSettings = { vm.selected.value?.let { vm.editCompany(it) }; screen = Screen.Settings },
+                        onCompanies = { screen = Screen.CompanyList },
                     )
 
                     Screen.Settings -> SettingsScreen(
                         vm,
-                        onClose = { screen = if (vm.selected.value != null) Screen.Invoice else Screen.CompanyList },
+                        onClose = { screen = if (vm.selected.value != null) Screen.Home else Screen.CompanyList },
                     )
 
                     Screen.Invoice -> InvoiceScreen(
                         vm,
-                        onCompanies = { screen = Screen.CompanyList },
+                        onHome = { screen = Screen.Home },
                         onHistory = { vm.loadHistory(); screen = Screen.History },
                         onSettings = { vm.selected.value?.let { vm.editCompany(it) }; screen = Screen.Settings },
                         onArticles = { vm.biranjeArtikla.value = false; vm.loadArticles(); screen = Screen.Articles },
@@ -57,13 +76,17 @@ class MainActivity : ComponentActivity() {
                         onPick = if (vm.biranjeArtikla.value) {
                             { a -> vm.dodajIzArtikla(a); vm.biranjeArtikla.value = false; screen = Screen.Invoice }
                         } else null,
-                        onBack = { vm.biranjeArtikla.value = false; screen = Screen.Invoice },
+                        onBack = {
+                            val pick = vm.biranjeArtikla.value
+                            vm.biranjeArtikla.value = false
+                            screen = if (pick) Screen.Invoice else Screen.Home
+                        },
                     )
 
                     Screen.History -> HistoryScreen(
                         vm,
                         onOpen = { vm.openDetail(it); screen = Screen.Detail },
-                        onBack = { screen = Screen.Invoice },
+                        onBack = { screen = Screen.Home },
                     )
 
                     Screen.Detail -> InvoiceDetailScreen(
