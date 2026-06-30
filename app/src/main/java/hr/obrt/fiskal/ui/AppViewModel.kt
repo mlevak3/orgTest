@@ -5,6 +5,8 @@ import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import hr.obrt.fiskal.data.Artikl
+import hr.obrt.fiskal.data.ArticleStore
 import hr.obrt.fiskal.data.CompanyStore
 import hr.obrt.fiskal.data.InvoiceStore
 import hr.obrt.fiskal.data.SavedInvoice
@@ -46,6 +48,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     val companyStore = CompanyStore(app)
     private val invoiceStore = InvoiceStore(app)
+    private val articleStore = ArticleStore(app)
 
     // --- Tvrtke ---
     val companies = mutableStateListOf<Tvrtka>()
@@ -57,6 +60,14 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     val nacinPlac = mutableStateOf(NacinPlac.G)
     /** Storno — svi iznosi računa idu u minus. */
     val storno = mutableStateOf(false)
+    val kupacNaziv = mutableStateOf("")
+    val kupacOib = mutableStateOf("")
+    val napomena = mutableStateOf("")
+
+    // --- Šifrarnik artikala ---
+    val articles = mutableStateListOf<Artikl>()
+    val editingArticle = mutableStateOf<Artikl?>(null)
+    val biranjeArtikla = mutableStateOf(false)
 
     // --- Izvršavanje / rezultat ---
     val ucitavanje = mutableStateOf(false)
@@ -134,8 +145,12 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         return s.copy(pdvIznos = fmt(pdv), ukupno = fmt(neto.add(pdv)))
     }
 
-    fun ukupno(): BigDecimal {
-        val base = stavke.fold(BigDecimal.ZERO) { acc, s -> acc.add(parse(s.ukupno)) }
+    fun ukupno(): BigDecimal = zbroj { it.ukupno }
+    fun zbrojNeto(): BigDecimal = zbroj { it.neto }
+    fun zbrojPdv(): BigDecimal = zbroj { it.pdvIznos }
+
+    private inline fun zbroj(selector: (StavkaInput) -> String): BigDecimal {
+        val base = stavke.fold(BigDecimal.ZERO) { acc, s -> acc.add(parse(selector(s))) }
             .setScale(2, RoundingMode.HALF_UP)
         return if (storno.value) base.negate() else base
     }
@@ -215,6 +230,9 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 qrUrl = ishod.qrUrl,
                 status = status,
                 createdAt = System.currentTimeMillis(),
+                kupac = kupacNaziv.value,
+                kupacOib = kupacOib.value,
+                napomena = napomena.value,
             )
         )
     }
@@ -234,8 +252,76 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         stavke.add(StavkaInput())
         nacinPlac.value = NacinPlac.G
         storno.value = false
+        kupacNaziv.value = ""
+        kupacOib.value = ""
+        napomena.value = ""
         ishod.value = null
         greska.value = null
+    }
+
+    // --- Šifrarnik artikala ---
+    fun loadArticles() {
+        val t = selected.value ?: return
+        articles.clear()
+        articles.addAll(articleStore.zaTvrtku(t.id))
+    }
+
+    fun newArticle() {
+        editingArticle.value = Artikl(
+            pdvStopa = if (selected.value?.uSustavuPdv == true) BigDecimal("25") else BigDecimal.ZERO,
+        )
+    }
+
+    fun editArticle(a: Artikl) { editingArticle.value = a }
+
+    fun saveArticle(a: Artikl) {
+        selected.value?.let { articleStore.spremi(it.id, a) }
+        loadArticles()
+        editingArticle.value = null
+    }
+
+    fun deleteArticle(a: Artikl) {
+        selected.value?.let { articleStore.obrisi(it.id, a.id) }
+        loadArticles()
+        editingArticle.value = null
+    }
+
+    /** Dodaje stavku iz artikla (zamijeni prazan red ili dodaj novi). */
+    fun dodajIzArtikla(a: Artikl) {
+        val novo = preracunajBazu(
+            StavkaInput(naziv = a.naziv, kolicina = "1", jedCijena = fmt(a.jedCijena), pdvStopa = fmt(a.pdvStopa))
+        )
+        val idx = stavke.indexOfFirst { it.naziv.isBlank() && parse(it.ukupno).signum() == 0 }
+        if (idx >= 0) stavke[idx] = novo else stavke.add(novo)
+    }
+
+    /** Učita stavke i podatke postojećeg računa u novi obrazac (za ponovno izdavanje/ispravak). */
+    fun kopirajURacun(si: SavedInvoice) {
+        stavke.clear()
+        si.racun.stavke.forEach { s ->
+            val neto = s.neto.abs()
+            val jed = if (s.kolicina.signum() != 0) neto.divide(s.kolicina, 2, RoundingMode.HALF_UP) else neto
+            stavke.add(
+                StavkaInput(
+                    naziv = s.naziv,
+                    kolicina = s.kolicina.toPlainString(),
+                    jedCijena = fmt(jed),
+                    pdvStopa = fmt(s.pdvStopa),
+                    neto = fmt(neto),
+                    pdvIznos = fmt(s.pdvIznos.abs()),
+                    ukupno = fmt(s.ukupno.abs()),
+                )
+            )
+        }
+        if (stavke.isEmpty()) stavke.add(StavkaInput())
+        kupacNaziv.value = si.kupac
+        kupacOib.value = si.kupacOib
+        napomena.value = si.napomena
+        storno.value = false
+        nacinPlac.value = si.racun.nacinPlac
+        ishod.value = null
+        greska.value = null
+        detail.value = null
     }
 
     // --- Povijest ---
@@ -256,8 +342,11 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     // --- Ispis / email ---
     fun receiptFromIshod(): ReceiptData? {
         val i = ishod.value ?: return null
-        val naziv = selected.value?.opis() ?: ""
-        return ReceiptData.fromIshod(naziv, i)
+        return ReceiptData(
+            naslovTvrtke = selected.value?.opis() ?: "",
+            racun = i.racun, jir = i.jir, zki = i.zki, qrUrl = i.qrUrl,
+            kupac = kupacNaziv.value, kupacOib = kupacOib.value, napomena = napomena.value,
+        )
     }
 
     fun receiptFromSaved(si: SavedInvoice) = ReceiptData(
@@ -266,6 +355,9 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         jir = si.jir,
         zki = si.zki,
         qrUrl = si.qrUrl,
+        kupac = si.kupac,
+        kupacOib = si.kupacOib,
+        napomena = si.napomena,
     )
 
     private fun parse(s: String): BigDecimal =

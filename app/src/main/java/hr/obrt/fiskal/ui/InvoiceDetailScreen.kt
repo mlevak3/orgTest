@@ -24,7 +24,7 @@ import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun InvoiceDetailScreen(vm: AppViewModel, onBack: () -> Unit) {
+fun InvoiceDetailScreen(vm: AppViewModel, onBack: () -> Unit, onCopy: () -> Unit) {
     val si = vm.detail.value ?: return
     val ctx = LocalContext.current
     val data = remember(si.id) { vm.receiptFromSaved(si) }
@@ -45,6 +45,12 @@ fun InvoiceDetailScreen(vm: AppViewModel, onBack: () -> Unit) {
         ) {
             item { Text(si.naslovTvrtke, style = MaterialTheme.typography.titleMedium) }
             item { Text("Datum: $datum", style = MaterialTheme.typography.bodySmall) }
+            if (si.kupac.isNotBlank() || si.kupacOib.isNotBlank()) item {
+                Text(
+                    "Kupac: ${si.kupac}" + (if (si.kupacOib.isNotBlank()) " (OIB ${si.kupacOib})" else ""),
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+            }
             item { Divider() }
             items(si.racun.stavke) { s ->
                 Column {
@@ -64,6 +70,7 @@ fun InvoiceDetailScreen(vm: AppViewModel, onBack: () -> Unit) {
                 Divider()
                 Text("UKUPNO: ${FiskalFormat.amount(si.racun.iznosUkupno)} €", style = MaterialTheme.typography.titleLarge)
                 Text("Plaćanje: ${si.racun.nacinPlac.opis}", style = MaterialTheme.typography.bodySmall)
+                if (si.napomena.isNotBlank()) Text("Napomena: ${si.napomena}", style = MaterialTheme.typography.bodySmall)
             }
             item {
                 Text("JIR", style = MaterialTheme.typography.labelLarge)
@@ -84,6 +91,11 @@ fun InvoiceDetailScreen(vm: AppViewModel, onBack: () -> Unit) {
                     onClick = { runCatching { uriHandler.openUri(si.qrUrl) } },
                     modifier = Modifier.fillMaxWidth(),
                 ) { Text("Provjeri na Poreznoj") }
+            }
+            item {
+                FilledTonalButton(onClick = onCopy, modifier = Modifier.fillMaxWidth()) {
+                    Text("Kopiraj u novi račun")
+                }
             }
             item {
                 OutlinedButton(

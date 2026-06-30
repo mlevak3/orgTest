@@ -9,17 +9,10 @@ data class ReceiptData(
     val jir: String?,
     val zki: String,
     val qrUrl: String,
+    val kupac: String = "",
+    val kupacOib: String = "",
+    val napomena: String = "",
 ) {
     fun brojRacuna(): String =
         "${racun.brOznRac}/${racun.zaglavlje.oznPosPr}/${racun.zaglavlje.oznNapUr}"
-
-    companion object {
-        fun fromIshod(naslovTvrtke: String, ishod: FiskalIshod) = ReceiptData(
-            naslovTvrtke = naslovTvrtke,
-            racun = ishod.racun,
-            jir = ishod.jir,
-            zki = ishod.zki,
-            qrUrl = ishod.qrUrl,
-        )
-    }
 }

@@ -30,8 +30,13 @@ object ReceiptPdf {
 
         val tinyH = 11f
         val urlLines = wrap(data.qrUrl, tiny, pageWidth - 2 * margin)
+        val kupacText = if (data.kupac.isNotBlank() || data.kupacOib.isNotBlank())
+            "Kupac: ${data.kupac}" + (if (data.kupacOib.isNotBlank()) " (OIB ${data.kupacOib})" else "") else null
+        val napomenaLines = if (data.napomena.isNotBlank())
+            wrap("Napomena: ${data.napomena}", normal, pageWidth - 2 * margin) else emptyList()
         val pdvBroj = if (z.uSustavuPdv) r.pdvGrupe().size + 1 else 1
-        val brojLinija = 6 + 1 + 1 + r.stavke.size + 1 + pdvBroj + 1 + 1 + 1 + 1
+        val dodatne = (if (kupacText != null) 1 else 0) + napomenaLines.size
+        val brojLinija = 6 + 1 + 1 + r.stavke.size + 1 + pdvBroj + 1 + 1 + 1 + 1 + dodatne
         val pdvPodredci = if (z.uSustavuPdv) r.stavke.size else 0
         val height = (margin * 2 + brojLinija * lineH + pdvPodredci * tinyH + 12 + qrSize + 8 +
             (1 + urlLines.size) * tinyH + 16).toInt()
@@ -61,6 +66,7 @@ object ReceiptPdf {
         line("Račun: ${data.brojRacuna()}")
         line("Datum: $datum")
         line("Operater: ${z.oibOper}")
+        kupacText?.let { line(it) }
         sep()
         line("Stavka", "Ukupno", bold)
         r.stavke.forEach { s ->
@@ -82,6 +88,7 @@ object ReceiptPdf {
             line("Obveznik nije u sustavu PDV-a.")
         }
         line("Plaćanje: ${r.nacinPlac.opis}")
+        napomenaLines.forEach { line(it) }
         sep()
         line("JIR: ${data.jir ?: "nije dodijeljen (naknadna dostava)"}")
         line("ZKI: ${data.zki}")

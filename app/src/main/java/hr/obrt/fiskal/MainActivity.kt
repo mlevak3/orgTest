@@ -9,6 +9,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.viewmodel.compose.viewModel
 import hr.obrt.fiskal.ui.AppViewModel
+import hr.obrt.fiskal.ui.ArticlesScreen
 import hr.obrt.fiskal.ui.CompanyListScreen
 import hr.obrt.fiskal.ui.HistoryScreen
 import hr.obrt.fiskal.ui.InvoiceDetailScreen
@@ -16,7 +17,7 @@ import hr.obrt.fiskal.ui.InvoiceScreen
 import hr.obrt.fiskal.ui.SettingsScreen
 import hr.obrt.fiskal.ui.theme.FiskalTheme
 
-private enum class Screen { CompanyList, Settings, Invoice, History, Detail }
+private enum class Screen { CompanyList, Settings, Invoice, History, Detail, Articles }
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -47,6 +48,16 @@ class MainActivity : ComponentActivity() {
                         onCompanies = { screen = Screen.CompanyList },
                         onHistory = { vm.loadHistory(); screen = Screen.History },
                         onSettings = { vm.selected.value?.let { vm.editCompany(it) }; screen = Screen.Settings },
+                        onArticles = { vm.biranjeArtikla.value = false; vm.loadArticles(); screen = Screen.Articles },
+                        onPickArticle = { vm.biranjeArtikla.value = true; vm.loadArticles(); screen = Screen.Articles },
+                    )
+
+                    Screen.Articles -> ArticlesScreen(
+                        vm,
+                        onPick = if (vm.biranjeArtikla.value) {
+                            { a -> vm.dodajIzArtikla(a); vm.biranjeArtikla.value = false; screen = Screen.Invoice }
+                        } else null,
+                        onBack = { vm.biranjeArtikla.value = false; screen = Screen.Invoice },
                     )
 
                     Screen.History -> HistoryScreen(
@@ -58,6 +69,7 @@ class MainActivity : ComponentActivity() {
                     Screen.Detail -> InvoiceDetailScreen(
                         vm,
                         onBack = { vm.closeDetail(); screen = Screen.History },
+                        onCopy = { vm.detail.value?.let { vm.kopirajURacun(it) }; screen = Screen.Invoice },
                     )
                 }
             }

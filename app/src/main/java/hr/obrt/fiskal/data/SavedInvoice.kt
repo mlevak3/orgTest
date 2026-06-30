@@ -22,6 +22,9 @@ data class SavedInvoice(
     val qrUrl: String,
     val status: String,
     val createdAt: Long,
+    val kupac: String = "",
+    val kupacOib: String = "",
+    val napomena: String = "",
 ) {
     fun brojRacuna(): String =
         "${racun.brOznRac}/${racun.zaglavlje.oznPosPr}/${racun.zaglavlje.oznNapUr}"
@@ -35,6 +38,9 @@ data class SavedInvoice(
         put("qrUrl", qrUrl)
         put("status", status)
         put("createdAt", createdAt)
+        put("kupac", kupac)
+        put("kupacOib", kupacOib)
+        put("napomena", napomena)
         val z = racun.zaglavlje
         put("oib", z.oib)
         put("uSustavuPdv", z.uSustavuPdv)
@@ -100,6 +106,9 @@ data class SavedInvoice(
                 qrUrl = o.optString("qrUrl"),
                 status = o.optString("status"),
                 createdAt = o.optLong("createdAt", System.currentTimeMillis()),
+                kupac = o.optString("kupac"),
+                kupacOib = o.optString("kupacOib"),
+                napomena = o.optString("napomena"),
             )
         }
     }

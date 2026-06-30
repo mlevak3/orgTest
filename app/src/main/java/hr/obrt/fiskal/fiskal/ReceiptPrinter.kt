@@ -80,6 +80,13 @@ object ReceiptPrinter {
         val jirRedak = data.jir?.let { "<div><b>JIR:</b> ${esc(it)}</div>" }
             ?: "<div class='warn'><b>JIR:</b> nije dodijeljen (naknadna dostava)</div>"
 
+        val kupacBlok = if (data.kupac.isNotBlank() || data.kupacOib.isNotBlank())
+            "<div><b>Kupac:</b> ${esc(data.kupac)}" +
+                (if (data.kupacOib.isNotBlank()) " (OIB ${esc(data.kupacOib)})" else "") + "</div>"
+        else ""
+        val napomenaBlok = if (data.napomena.isNotBlank())
+            "<div class='note'><b>Napomena:</b> ${esc(data.napomena)}</div>" else ""
+
         return """
             <!DOCTYPE html><html lang="hr"><head><meta charset="UTF-8">
             <style>
@@ -104,6 +111,7 @@ object ReceiptPrinter {
               <div><b>Broj računa:</b> ${esc(brojRacuna)}</div>
               <div><b>Datum:</b> $datum</div>
               <div><b>Operater:</b> ${esc(z.oibOper)}</div>
+              $kupacBlok
               <div class="line"></div>
               <table>
                 $stavkeHeader
@@ -112,6 +120,7 @@ object ReceiptPrinter {
               <div class="total">UKUPNO: ${FiskalFormat.amount(r.iznosUkupno)} EUR</div>
               $pdvBlok
               <div><b>Način plaćanja:</b> ${r.nacinPlac.opis}</div>
+              $napomenaBlok
               <div class="line"></div>
               $jirRedak
               <div class="codes"><b>ZKI:</b> ${esc(data.zki)}</div>
