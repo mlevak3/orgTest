@@ -45,23 +45,37 @@ fun HomeScreen(
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            Text(
-                vm.selected.value?.opis() ?: "—",
-                style = MaterialTheme.typography.headlineSmall,
-                fontWeight = FontWeight.Bold,
-            )
-            Text(
-                "OIB ${vm.selected.value?.oib ?: "—"} · ${vm.selected.value?.okolina?.opis ?: ""}",
-                style = MaterialTheme.typography.bodyMedium,
-                color = cs.onSurfaceVariant,
-            )
+            // Istaknuta odabrana tvrtka + promjena
+            Card(
+                colors = CardDefaults.cardColors(containerColor = cs.primaryContainer, contentColor = cs.onPrimaryContainer),
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Row(Modifier.padding(18.dp).fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Filled.Business, null, Modifier.size(34.dp))
+                    Spacer(Modifier.width(14.dp))
+                    Column(Modifier.weight(1f)) {
+                        Text("ODABRANA TVRTKA", style = MaterialTheme.typography.labelSmall)
+                        Text(
+                            vm.selected.value?.opis() ?: "—",
+                            style = MaterialTheme.typography.titleLarge,
+                            fontWeight = FontWeight.Bold,
+                            maxLines = 1,
+                        )
+                        Text(
+                            "OIB ${vm.selected.value?.oib ?: "—"} · ${vm.selected.value?.okolina?.opis ?: ""}",
+                            style = MaterialTheme.typography.bodySmall,
+                        )
+                    }
+                    FilledTonalButton(onClick = onCompanies) { Text("Promijeni") }
+                }
+            }
+
             Spacer(Modifier.height(4.dp))
 
-            MenuKartica("Novi račun", "Unesi i fiskaliziraj račun", Icons.Filled.Add, cs.primaryContainer, cs.onPrimaryContainer, onNewInvoice)
+            MenuKartica("Novi račun", "Unesi i fiskaliziraj račun", Icons.Filled.Add, cs.primary, cs.onPrimary, onNewInvoice)
             MenuKartica("Pregled računa", "Povijest, ispis i email", Icons.Filled.List, cs.secondaryContainer, cs.onSecondaryContainer, onHistory)
             MenuKartica("Šifrarnik artikala", "Spremljeni artikli i usluge", Icons.Filled.ShoppingCart, cs.tertiaryContainer, cs.onTertiaryContainer, onArticles)
             MenuKartica("Postavke tvrtke", "Certifikat, prostor, numeracija", Icons.Filled.Settings, cs.surfaceVariant, cs.onSurfaceVariant, onSettings)
-            MenuKartica("Promijeni tvrtku", "Odaberi drugu ili dodaj novu", Icons.Filled.Business, cs.surfaceVariant, cs.onSurfaceVariant, onCompanies)
         }
     }
 }
