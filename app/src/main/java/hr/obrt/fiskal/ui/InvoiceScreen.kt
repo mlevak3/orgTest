@@ -92,10 +92,26 @@ fun InvoiceScreen(
             }
 
             item {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Switch(checked = vm.storno.value, onCheckedChange = { vm.storno.value = it })
+                    Spacer(Modifier.width(8.dp))
+                    Column {
+                        Text("Storno (iznosi u minus)")
+                        if (vm.storno.value) Text(
+                            "Račun će biti fiskaliziran s negativnim iznosima.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.error,
+                        )
+                    }
+                }
+            }
+
+            item {
                 Divider()
                 Text(
                     "UKUPNO: ${vm.ukupno().toPlainString()} EUR",
                     style = MaterialTheme.typography.headlineSmall,
+                    color = if (vm.storno.value) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface,
                 )
             }
 

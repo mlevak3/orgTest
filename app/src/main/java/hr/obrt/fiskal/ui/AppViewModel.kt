@@ -55,6 +55,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     // --- Stanje računa ---
     val stavke = mutableStateListOf(StavkaInput())
     val nacinPlac = mutableStateOf(NacinPlac.G)
+    /** Storno — svi iznosi računa idu u minus. */
+    val storno = mutableStateOf(false)
 
     // --- Izvršavanje / rezultat ---
     val ucitavanje = mutableStateOf(false)
@@ -132,9 +134,11 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         return s.copy(pdvIznos = fmt(pdv), ukupno = fmt(neto.add(pdv)))
     }
 
-    fun ukupno(): BigDecimal =
-        stavke.fold(BigDecimal.ZERO) { acc, s -> acc.add(parse(s.ukupno)) }
+    fun ukupno(): BigDecimal {
+        val base = stavke.fold(BigDecimal.ZERO) { acc, s -> acc.add(parse(s.ukupno)) }
             .setScale(2, RoundingMode.HALF_UP)
+        return if (storno.value) base.negate() else base
+    }
 
     fun fiskaliziraj() {
         greska.value = null
@@ -170,14 +174,14 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             brOznRac = t.sljedeciBroj,
             datVrijeme = Date(),
             stavke = stavke.map {
-                val neto = parse(it.neto)
+                fun iznos(x: String) = parse(x).let { v -> if (storno.value) v.negate() else v }
                 Stavka(
                     naziv = it.naziv,
                     kolicina = parse(it.kolicina),
                     pdvStopa = parse(it.pdvStopa),
-                    neto = neto,
-                    pdvIznos = parse(it.pdvIznos),
-                    ukupno = parse(it.ukupno),
+                    neto = iznos(it.neto),
+                    pdvIznos = iznos(it.pdvIznos),
+                    ukupno = iznos(it.ukupno),
                 )
             },
             nacinPlac = nacinPlac.value,
@@ -220,8 +224,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         if (t.oib.length != 11) return "OIB tvrtke mora imati 11 znamenki (Postavke)."
         if (!companyStore.certPostoji(t.id)) return "FINA certifikat nije učitan (Postavke tvrtke)."
         if (companyStore.lozinka(t.id).isBlank()) return "Lozinka certifikata nije postavljena (Postavke)."
-        if (stavke.none { it.naziv.isNotBlank() && parse(it.ukupno) > BigDecimal.ZERO })
-            return "Dodaj barem jednu stavku s iznosom."
+        if (stavke.none { it.naziv.isNotBlank() && parse(it.ukupno).signum() != 0 })
+            return "Dodaj barem jednu stavku s iznosom (≠ 0)."
         return null
     }
 
@@ -229,6 +233,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         stavke.clear()
         stavke.add(StavkaInput())
         nacinPlac.value = NacinPlac.G
+        storno.value = false
         ishod.value = null
         greska.value = null
     }
