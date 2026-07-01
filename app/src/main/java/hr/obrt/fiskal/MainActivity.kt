@@ -80,11 +80,9 @@ class MainActivity : ComponentActivity() {
                         onToggleTema = { tema = tema.sljedeca(); appPrefs.tema = tema },
                         onHistory = { vm.loadHistory(); screen = Screen.History },
                         onArticles = { vm.biranjeArtikla.value = false; vm.loadArticles(); screen = Screen.Articles },
-                        onPartners = { vm.biranjePartnera.value = false; vm.loadPartners(); screen = Screen.Partners },
                         onSettings = { vm.selected.value?.let { vm.editCompany(it) }; screen = Screen.Settings },
                         onCompanies = { screen = Screen.CompanyList },
                         onBackup = { screen = Screen.Backup },
-                        onReports = { screen = Screen.Reports },
                         onOpenInvoice = { vm.loadHistory(); vm.openDetail(it); screen = Screen.Detail },
                     )
 

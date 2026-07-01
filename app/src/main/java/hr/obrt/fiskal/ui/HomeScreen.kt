@@ -7,12 +7,11 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.Assessment
 import androidx.compose.material.icons.rounded.ChevronRight
-import androidx.compose.material.icons.rounded.Group
+import androidx.compose.material.icons.rounded.CloudUpload
 import androidx.compose.material.icons.rounded.Inventory2
 import androidx.compose.material.icons.rounded.Print
-import androidx.compose.material.icons.rounded.ReceiptLong
+import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material.icons.rounded.Share
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -46,11 +45,9 @@ fun HomeScreen(
     onToggleTema: () -> Unit,
     onHistory: () -> Unit,
     onArticles: () -> Unit,
-    onPartners: () -> Unit,
     onSettings: () -> Unit,
     onCompanies: () -> Unit,
     onBackup: () -> Unit,
-    onReports: () -> Unit,
     onOpenInvoice: (SavedInvoice) -> Unit,
 ) {
     val t = LocalFiskalTokens.current
@@ -72,19 +69,8 @@ fun HomeScreen(
             prometMjesecText = hrEur(prometMjesec),
         )
 
-        Box(Modifier.fillMaxWidth().padding(horizontal = FiskalSpacing.screenX)) {
-            FiskalCard(Modifier.fillMaxWidth().offset(y = (-32).dp)) {
-                Row(Modifier.padding(vertical = 8.dp).fillMaxWidth()) {
-                    PrecacTile("Računi", Icons.Rounded.ReceiptLong, false, Modifier.weight(1f), onHistory)
-                    PrecacTile("Artikli", Icons.Rounded.Inventory2, true, Modifier.weight(1f), onArticles)
-                    PrecacTile("Partneri", Icons.Rounded.Group, false, Modifier.weight(1f), onPartners)
-                    PrecacTile("Izvještaji", Icons.Rounded.Assessment, true, Modifier.weight(1f), onReports)
-                }
-            }
-        }
-
         Column(
-            Modifier.fillMaxWidth().padding(horizontal = FiskalSpacing.screenX).offset(y = (-18).dp),
+            Modifier.fillMaxWidth().padding(horizontal = FiskalSpacing.screenX, vertical = FiskalSpacing.stackGap),
             verticalArrangement = Arrangement.spacedBy(FiskalSpacing.stackGap),
         ) {
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
@@ -133,26 +119,15 @@ fun HomeScreen(
             Text("Ostalo", style = MaterialTheme.typography.titleSmall, color = t.ink)
             FiskalCard(Modifier.fillMaxWidth()) {
                 Column {
-                    OstaloRedak("Postavke tvrtke", onSettings)
+                    OstaloRedak("Šifrarnik artikala", Icons.Rounded.Inventory2, onArticles)
                     androidx.compose.material3.Divider(color = t.border, modifier = Modifier.padding(horizontal = FiskalSpacing.card))
-                    OstaloRedak("Sigurnosna kopija", onBackup)
+                    OstaloRedak("Postavke tvrtke", Icons.Rounded.Settings, onSettings)
+                    androidx.compose.material3.Divider(color = t.border, modifier = Modifier.padding(horizontal = FiskalSpacing.card))
+                    OstaloRedak("Sigurnosna kopija", Icons.Rounded.CloudUpload, onBackup)
                 }
             }
             Spacer(Modifier.height(FiskalSpacing.listPad))
         }
-    }
-}
-
-@Composable
-private fun PrecacTile(naslov: String, ikona: ImageVector, terakota: Boolean, modifier: Modifier, onClick: () -> Unit) {
-    val t = LocalFiskalTokens.current
-    Column(
-        modifier.clickable(onClick = onClick).padding(vertical = 8.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-    ) {
-        IconTile(ikona, terakota)
-        Spacer(Modifier.height(6.dp))
-        Text(naslov, style = MaterialTheme.typography.labelMedium, color = t.ink, maxLines = 1)
     }
 }
 
@@ -166,12 +141,14 @@ private fun KrugGumb(ikona: ImageVector, onClick: () -> Unit) {
 }
 
 @Composable
-private fun OstaloRedak(naslov: String, onClick: () -> Unit) {
+private fun OstaloRedak(naslov: String, ikona: ImageVector, onClick: () -> Unit) {
     val t = LocalFiskalTokens.current
     Row(
-        Modifier.fillMaxWidth().clickable(onClick = onClick).padding(FiskalSpacing.card),
+        Modifier.fillMaxWidth().clickable(onClick = onClick).padding(horizontal = FiskalSpacing.card, vertical = 14.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
+        IconTile(ikona, size = 36.dp)
+        Spacer(Modifier.width(12.dp))
         Text(naslov, style = MaterialTheme.typography.bodyLarge, color = t.ink, modifier = Modifier.weight(1f))
         Icon(Icons.Rounded.ChevronRight, null, tint = t.mutedSoft)
     }
