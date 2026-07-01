@@ -18,6 +18,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Brightness4
 import androidx.compose.material.icons.rounded.Brightness6
 import androidx.compose.material.icons.rounded.Brightness7
+import androidx.compose.material.icons.rounded.ExpandMore
 import androidx.compose.material.icons.rounded.Storefront
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -63,11 +64,13 @@ fun HeroHeader(
             ) {
                 Icon(Icons.Rounded.Storefront, null, tint = t.oliveInk, modifier = Modifier.size(18.dp))
                 Spacer(Modifier.width(6.dp))
-                Text(tvrtkaNaziv, color = t.oliveInk, style = MaterialTheme.typography.bodyLarge, maxLines = 1)
+                Text(tvrtkaNaziv, color = t.oliveInk, style = MaterialTheme.typography.bodyLarge, maxLines = 1, modifier = Modifier.weight(1f, fill = false))
                 Spacer(Modifier.width(6.dp))
                 Box(
                     Modifier.clip(RoundedCornerShape(FiskalRadius.pill)).background(t.oliveInk.copy(alpha = 0.18f)).padding(horizontal = 8.dp, vertical = 2.dp),
-                ) { Text(okolinaLabel, color = t.oliveInk, style = MaterialTheme.typography.labelMedium) }
+                ) { Text(okolinaLabel, color = t.oliveInk, style = MaterialTheme.typography.labelMedium, maxLines = 1) }
+                Spacer(Modifier.width(4.dp))
+                Icon(Icons.Rounded.ExpandMore, "Promijeni tvrtku", tint = t.oliveInk, modifier = Modifier.size(20.dp))
             }
             Spacer(Modifier.width(8.dp))
             Box(

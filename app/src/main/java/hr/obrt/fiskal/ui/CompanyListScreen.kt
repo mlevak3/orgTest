@@ -21,6 +21,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import hr.obrt.fiskal.data.Tvrtka
 import hr.obrt.fiskal.ui.components.FiskalCard
@@ -73,7 +74,14 @@ fun CompanyListScreen(
                         Spacer(Modifier.width(12.dp))
                         Column(Modifier.weight(1f)) {
                             Row(verticalAlignment = Alignment.CenterVertically) {
-                                Text(comp.opis(), style = MaterialTheme.typography.titleMedium, color = t.ink)
+                                Text(
+                                    comp.opis(),
+                                    style = MaterialTheme.typography.titleMedium,
+                                    color = t.ink,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                    modifier = Modifier.weight(1f, fill = false),
+                                )
                                 if (aktivna) { Spacer(Modifier.width(8.dp)); MiniBadge("AKTIVNA") }
                             }
                             Text(

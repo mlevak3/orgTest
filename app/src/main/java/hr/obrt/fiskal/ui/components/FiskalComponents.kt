@@ -146,7 +146,7 @@ fun MiniBadge(text: String, modifier: Modifier = Modifier) {
             .background(t.terracottaTint)
             .padding(horizontal = 8.dp, vertical = 3.dp),
     ) {
-        Text(text, color = t.terracottaTintInk, fontWeight = FontWeight.ExtraBold, style = MaterialTheme.typography.bodySmall)
+        Text(text, color = t.terracottaTintInk, fontWeight = FontWeight.ExtraBold, style = MaterialTheme.typography.bodySmall, maxLines = 1, softWrap = false)
     }
 }
 
