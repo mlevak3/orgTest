@@ -108,7 +108,7 @@ fun HistoryScreen(vm: AppViewModel, onOpen: (SavedInvoice) -> Unit, onBack: () -
             ) {
                 items(filtrirani) { si ->
                     FiskalCard(Modifier.fillMaxWidth(), onClick = { onOpen(si) }) {
-                        Column(Modifier.padding(FiskalSpacing.card), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Column(Modifier.padding(horizontal = FiskalSpacing.card, vertical = 12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 Text("Račun ${si.brojRacuna()}", style = MaterialTheme.typography.titleMedium, color = t.ink, modifier = Modifier.weight(1f))
                                 Text(hrEur(si.racun.iznosUkupno), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = t.ink)
@@ -119,7 +119,7 @@ fun HistoryScreen(vm: AppViewModel, onOpen: (SavedInvoice) -> Unit, onBack: () -
                                 color = t.muted,
                             )
                             Row(verticalAlignment = Alignment.CenterVertically) {
-                                StatusBadge(si.jir != null, Modifier.weight(1f, fill = false))
+                                StatusBadge(si.jir != null)
                                 Spacer(Modifier.weight(1f))
                                 KrugAkcija(Icons.Rounded.Print) { ReceiptPrinter.print(ctx, vm.receiptFromSaved(si)) }
                                 Spacer(Modifier.width(8.dp))

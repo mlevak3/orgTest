@@ -383,8 +383,9 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 onSuccess = { ishod.value = it },
                 onFailure = { greska.value = it.message ?: "Nepoznata greška." },
             )
-            // Osvježi tvrtku/selekciju bez obzira na ishod (povecajBroj se poziva samo kod uspjeha,
-            // ali refreshCompanies je bezopasan i inače).
+            // Osvježi tvrtku/selekciju nakon svakog pokušaja (povecajBroj se u izvrsi()
+            // poziva bez obzira na ishod, pa selekciju treba osvježiti da predloženi
+            // broj za sljedeći račun bude točan).
             val t = selected.value
             val d = selectedDjelatnost.value
             val p = selectedProstor.value
@@ -443,9 +444,13 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         val ishod = service.fiskaliziraj(racun)
 
         spremiUPovijest(t, ishod)
-        if (ishod.rezultat is FiskalRezultat.Uspjeh) {
-            companyStore.povecajBroj(t.id, djelatnost.id, prostor.id, uredjaj.id)
-        }
+        // Broj se povećava nakon SVAKOG pokušaja (ne samo uspješnog) — ZKI je već
+        // izračunat i račun je mogao biti otisnut/predan kupcu bez obzira je li CIS
+        // potvrdio JIR, pa isti broj/prostor/uređaj ne smije biti dodijeljen dvaput.
+        // Ponovni pokušaj (naknadna dostava) namjerno NE prolazi kroz ovu funkciju
+        // već kroz ponoviIzvrsi(), koji šalje ISTI broj — ovdje se broj uvijek odnosi
+        // na potpuno nov račun.
+        companyStore.povecajBroj(t.id, djelatnost.id, prostor.id, uredjaj.id)
         ishod
     }
 

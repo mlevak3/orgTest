@@ -100,7 +100,7 @@ fun HomeScreen(
 
             if (zadnji != null) {
                 FiskalCard(Modifier.fillMaxWidth(), onClick = { onOpenInvoice(zadnji) }) {
-                    Column(Modifier.padding(FiskalSpacing.card), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Column(Modifier.padding(horizontal = FiskalSpacing.card, vertical = 12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Text("Račun ${zadnji.brojRacuna()}", style = MaterialTheme.typography.titleMedium, color = t.ink, modifier = Modifier.weight(1f))
                             Text(hrEur(zadnji.racun.iznosUkupno), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = t.ink)
@@ -111,7 +111,7 @@ fun HomeScreen(
                             color = t.muted,
                         )
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            StatusBadge(zadnji.jir != null, Modifier.weight(1f, fill = false))
+                            StatusBadge(zadnji.jir != null)
                             Spacer(Modifier.weight(1f))
                             KrugGumb(Icons.Rounded.Print) { ReceiptPrinter.print(ctx, vm.receiptFromSaved(zadnji)) }
                             Spacer(Modifier.width(8.dp))
