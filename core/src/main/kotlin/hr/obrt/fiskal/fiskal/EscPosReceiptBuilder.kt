@@ -38,57 +38,78 @@ object EscPosReceiptBuilder {
 
         raw(intArrayOf(ESC, 0x40)) // init
 
-        align(1); bold(true); ln(data.naslovTvrtke); bold(false); align(0)
+        align(1); bold(true); ln(data.naslovTvrtke); bold(false)
         ln("OIB: ${z.oib}")
         ln("Racun: ${data.brojRacuna()}")
-        ln("Datum: ${SimpleDateFormat("dd.MM.yyyy HH:mm:ss", Locale.ROOT).format(r.datVrijeme)}")
-        ln("Operater: ${z.oibOper}")
+        ln(SimpleDateFormat("dd.MM.yyyy. HH:mm:ss", Locale.ROOT).format(r.datVrijeme))
+        align(0)
+        ln("Djelatnik: ${z.oibOper}")
         if (data.kupac.isNotBlank() || data.kupacOib.isNotBlank()) {
             ln("Kupac: ${data.kupac}" + if (data.kupacOib.isNotBlank()) " (OIB ${data.kupacOib})" else "")
         }
-        ln("-".repeat(WIDTH))
+        ln("=".repeat(WIDTH))
 
+        bold(true); ln("NAZIV ARTIKLA"); bold(false)
+        ln(redak("Kolicina  x  Cijena", "Iznos", WIDTH))
+        ln("-".repeat(WIDTH))
         r.stavke.forEach { s ->
             ln(s.naziv)
-            val desno = "${FiskalFormat.amount(s.ukupno)} EUR"
-            ln(redak("${s.kolicina.toPlainString()} x", desno, WIDTH))
-            if (z.uSustavuPdv) {
-                ln("  neto ${FiskalFormat.amount(s.neto)} PDV${FiskalFormat.amount(s.pdvStopa)}%=${FiskalFormat.amount(s.pdvIznos)}")
-            }
+            val kolJed = "${s.kolicina.toPlainString()} ${s.jedMjere}"
+            val cijena = FiskalFormat.amount(s.jedinicnaCijena())
+            ln(redak("$kolJed x $cijena", FiskalFormat.amount(s.ukupno), WIDTH))
         }
-        ln("-".repeat(WIDTH))
+        ln("=".repeat(WIDTH))
 
         bigOn()
-        ln(redak("UKUPNO", "${FiskalFormat.amount(r.iznosUkupno)} EUR", WIDTH / 2))
+        ln(redak("TOTAL:", "${FiskalFormat.amount(r.iznosUkupno)} EUR", WIDTH / 2))
         bigOff()
-
-        if (z.uSustavuPdv) {
-            r.pdvGrupe().forEach { g ->
-                ln(redak("PDV ${FiskalFormat.amount(g.stopa)}% (${FiskalFormat.amount(g.osnovica)})", FiskalFormat.amount(g.iznos), WIDTH))
-            }
-        } else {
-            ln("Nije u sustavu PDV-a.")
-        }
-        ln("Placanje: ${r.nacinPlac.opis}")
-        if (data.napomena.isNotBlank()) ln("Napomena: ${data.napomena}")
         ln("-".repeat(WIDTH))
 
-        ln("JIR:")
-        ln(data.jir ?: "(nije dodijeljen - naknadna dostava)")
-        ln("ZKI:")
-        ln(data.zki)
+        bold(true); ln("NACIN PLACANJA"); bold(false)
+        ln(redak(r.nacinPlac.opis, "${FiskalFormat.amount(r.iznosUkupno)} EUR", WIDTH))
+        if (data.napomena.isNotBlank()) { ln("-".repeat(WIDTH)); ln("Napomena: ${data.napomena}") }
+
+        if (z.uSustavuPdv) {
+            ln("-".repeat(WIDTH))
+            bold(true); ln("REKAPITULACIJA POREZA"); bold(false)
+            ln(stupci("%PDV", "Osnovica", "PDV", "Ukupno"))
+            var sumOsn = java.math.BigDecimal.ZERO
+            var sumPdv = java.math.BigDecimal.ZERO
+            r.pdvGrupe().forEach { g ->
+                ln(stupci(FiskalFormat.amount(g.stopa), FiskalFormat.amount(g.osnovica), FiskalFormat.amount(g.iznos), FiskalFormat.amount(g.osnovica.add(g.iznos))))
+                sumOsn = sumOsn.add(g.osnovica); sumPdv = sumPdv.add(g.iznos)
+            }
+            ln(stupci("", "TOTAL:", "", ""))
+            ln(stupci("", FiskalFormat.amount(sumOsn), FiskalFormat.amount(sumPdv), FiskalFormat.amount(sumOsn.add(sumPdv))))
+        } else {
+            ln("-".repeat(WIDTH))
+            ln("Nije u sustavu PDV-a.")
+        }
+        ln("=".repeat(WIDTH))
+
+        ln("ZKI: ${data.zki}")
+        ln("JIR: ${data.jir ?: "(nije dodijeljen - naknadna dostava)"}")
         ln()
 
         align(1)
         qrCode(::bytes, ::raw, data.qrUrl)
         text("\n")
         ln("Provjera: porezna.gov.hr/rn")
+        ln()
+        bold(true); ln("Hvala na posjeti!"); bold(false)
         align(0)
 
         text("\n\n\n")
         raw(intArrayOf(GS, 0x56, 66, 0)) // djelomično odrezivanje papira
 
         return out.toByteArray()
+    }
+
+    /** Četiri stupca jednakih širina unutar [WIDTH] (za tablicu rekapitulacije poreza). */
+    private fun stupci(a: String, b: String, c: String, d: String): String {
+        val w = WIDTH / 4
+        fun cell(s: String) = if (s.length >= w) s.take(w) else s.padEnd(w)
+        return cell(a) + cell(b) + cell(c) + cell(d)
     }
 
     /** Kratka testna stranica — provjera veze i ispravnosti pisača. */

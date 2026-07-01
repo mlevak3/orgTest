@@ -55,7 +55,10 @@ object BluetoothPrinter {
             return Result.failure(IllegalArgumentException("Neispravna adresa pisača: ${e.message}"))
         }
 
-        adapter.cancelDiscovery()
+        // cancelDiscovery() na Androidu 12+ zahtijeva BLUETOOTH_SCAN (drugu dozvolu od
+        // BLUETOOTH_CONNECT koju tražimo) — bez nje baca SecurityException. Nije nužan za
+        // spajanje na već uparen uređaj, pa se preskače ako dozvola nedostaje.
+        runCatching { adapter.cancelDiscovery() }
 
         // 1) Standardni pristup (SDP upit za SPP UUID).
         val standardno = pokusajSpojiIPoslati(device, bytes) { device.createRfcommSocketToServiceRecord(SPP_UUID) }

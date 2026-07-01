@@ -37,6 +37,7 @@ import java.util.UUID
 data class StavkaInput(
     var naziv: String = "",
     var kolicina: String = "1",
+    var jedMjere: String = "kom",
     var jedCijena: String = "",
     var pdvStopa: String = "25",
     var neto: String = "",
@@ -110,7 +111,12 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     // --- Stavke ---
-    fun dodajStavku() = stavke.add(StavkaInput(pdvStopa = selected.value?.zadanaPdvStopa ?: "25"))
+    fun dodajStavku() = stavke.add(
+        StavkaInput(
+            pdvStopa = selected.value?.zadanaPdvStopa ?: "25",
+            jedMjere = selected.value?.zadanaJedMjere ?: "kom",
+        )
+    )
     fun ukloniStavku(index: Int) { if (stavke.size > 1) stavke.removeAt(index) }
 
     private fun uSustavuPdv(): Boolean = selected.value?.uSustavuPdv == true
@@ -118,6 +124,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     fun setNaziv(i: Int, v: String) { stavke[i] = stavke[i].copy(naziv = v) }
     fun setKolicina(i: Int, v: String) { stavke[i] = preracunajBazu(stavke[i].copy(kolicina = v)) }
+    fun setJedMjere(i: Int, v: String) { stavke[i] = stavke[i].copy(jedMjere = v) }
     fun setJedCijena(i: Int, v: String) { stavke[i] = preracunajBazu(stavke[i].copy(jedCijena = v)) }
     fun setStopa(i: Int, v: String) { stavke[i] = preracunajOdNeto(stavke[i].copy(pdvStopa = v)) }
     fun setNeto(i: Int, v: String) { stavke[i] = preracunajOdNeto(stavke[i].copy(neto = v)) }
@@ -202,6 +209,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                     neto = iznos(it.neto),
                     pdvIznos = iznos(it.pdvIznos),
                     ukupno = iznos(it.ukupno),
+                    jedMjere = it.jedMjere.ifBlank { "kom" },
                 )
             },
             nacinPlac = nacinPlac.value,
@@ -255,7 +263,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     fun resetRacun() {
         val t = selected.value
         stavke.clear()
-        stavke.add(StavkaInput(pdvStopa = t?.zadanaPdvStopa ?: "25"))
+        stavke.add(StavkaInput(pdvStopa = t?.zadanaPdvStopa ?: "25", jedMjere = t?.zadanaJedMjere ?: "kom"))
         nacinPlac.value = t?.zadaniNacinPlac ?: NacinPlac.G
         storno.value = false
         kupacNaziv.value = ""
@@ -297,7 +305,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     /** Dodaje stavku iz artikla (zamijeni prazan red ili dodaj novi). */
     fun dodajIzArtikla(a: Artikl) {
         val novo = preracunajBazu(
-            StavkaInput(naziv = a.naziv, kolicina = "1", jedCijena = fmt(a.jedCijena), pdvStopa = fmt(a.pdvStopa))
+            StavkaInput(naziv = a.naziv, kolicina = "1", jedMjere = a.jedMjere, jedCijena = fmt(a.jedCijena), pdvStopa = fmt(a.pdvStopa))
         )
         val idx = stavke.indexOfFirst { it.naziv.isBlank() && parse(it.ukupno).signum() == 0 }
         if (idx >= 0) stavke[idx] = novo else stavke.add(novo)
@@ -313,6 +321,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 StavkaInput(
                     naziv = s.naziv,
                     kolicina = s.kolicina.toPlainString(),
+                    jedMjere = s.jedMjere,
                     jedCijena = fmt(jed),
                     pdvStopa = fmt(s.pdvStopa),
                     neto = fmt(neto),

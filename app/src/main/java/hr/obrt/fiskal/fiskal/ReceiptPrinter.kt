@@ -49,19 +49,25 @@ object ReceiptPrinter {
         val brojRacuna = "${r.brOznRac}/${z.oznPosPr}/${z.oznNapUr}"
 
         val stavkeHeader = if (z.uSustavuPdv) {
-            "<tr><th>Naziv</th><th class=\"r\">Neto</th><th class=\"r\">PDV</th><th class=\"r\">Ukupno</th></tr>"
+            "<tr><th>Naziv</th><th class=\"r\">Kol.</th><th class=\"r\">Cijena</th>" +
+                "<th class=\"r\">Neto</th><th class=\"r\">PDV</th><th class=\"r\">Ukupno</th></tr>"
         } else {
-            "<tr><th>Naziv</th><th class=\"r\">Kol.</th><th class=\"r\">Iznos</th></tr>"
+            "<tr><th>Naziv</th><th class=\"r\">Kol.</th><th class=\"r\">Cijena</th><th class=\"r\">Ukupno</th></tr>"
         }
         val stavkeRedovi = r.stavke.joinToString("") { s ->
+            val kol = "${s.kolicina.toPlainString()} ${esc(s.jedMjere)}"
+            val cijena = FiskalFormat.amount(s.jedinicnaCijena())
             if (z.uSustavuPdv) {
                 "<tr><td>${esc(s.naziv)}</td>" +
+                    "<td class='r'>$kol</td>" +
+                    "<td class='r'>$cijena</td>" +
                     "<td class='r'>${FiskalFormat.amount(s.neto)}</td>" +
                     "<td class='r'>${FiskalFormat.amount(s.pdvIznos)}</td>" +
                     "<td class='r'>${FiskalFormat.amount(s.ukupno)}</td></tr>"
             } else {
                 "<tr><td>${esc(s.naziv)}</td>" +
-                    "<td class='r'>${s.kolicina.toPlainString()}</td>" +
+                    "<td class='r'>$kol</td>" +
+                    "<td class='r'>$cijena</td>" +
                     "<td class='r'>${FiskalFormat.amount(s.ukupno)}</td></tr>"
             }
         }

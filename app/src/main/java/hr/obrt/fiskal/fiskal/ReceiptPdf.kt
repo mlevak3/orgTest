@@ -37,7 +37,9 @@ object ReceiptPdf {
         val pdvBroj = if (z.uSustavuPdv) r.pdvGrupe().size + 1 else 1
         val dodatne = (if (kupacText != null) 1 else 0) + napomenaLines.size
         val brojLinija = 6 + 1 + 1 + r.stavke.size + 1 + pdvBroj + 1 + 1 + 1 + 1 + dodatne
-        val pdvPodredci = if (z.uSustavuPdv) r.stavke.size else 0
+        // Svaka stavka dobiva dodatni redak "kol. x cijena"; PDV obveznik još i redak neto/PDV.
+        val podredciPoStavci = if (z.uSustavuPdv) 2 else 1
+        val pdvPodredci = r.stavke.size * podredciPoStavci
         val height = (margin * 2 + brojLinija * lineH + pdvPodredci * tinyH + 12 + qrSize + 8 +
             (1 + urlLines.size) * tinyH + 16).toInt()
 
@@ -71,6 +73,11 @@ object ReceiptPdf {
         line("Stavka", "Ukupno", bold)
         r.stavke.forEach { s ->
             line(s.naziv.take(34), FiskalFormat.amount(s.ukupno))
+            c.drawText(
+                "  ${s.kolicina.toPlainString()} ${s.jedMjere} x ${FiskalFormat.amount(s.jedinicnaCijena())}",
+                margin, y, tiny,
+            )
+            y += tinyH
             if (z.uSustavuPdv) {
                 c.drawText(
                     "  neto ${FiskalFormat.amount(s.neto)} · PDV ${FiskalFormat.amount(s.pdvStopa)}% = ${FiskalFormat.amount(s.pdvIznos)}",

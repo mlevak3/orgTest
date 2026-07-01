@@ -57,6 +57,7 @@ data class SavedInvoice(
             arr.put(JSONObject().apply {
                 put("naziv", s.naziv)
                 put("kolicina", s.kolicina.toPlainString())
+                put("jedMjere", s.jedMjere)
                 put("pdvStopa", s.pdvStopa.toPlainString())
                 put("neto", s.neto.toPlainString())
                 put("pdvIznos", s.pdvIznos.toPlainString())
@@ -86,6 +87,7 @@ data class SavedInvoice(
                     neto = BigDecimal(s.optString("neto", "0")),
                     pdvIznos = BigDecimal(s.optString("pdvIznos", "0")),
                     ukupno = BigDecimal(s.optString("ukupno", "0")),
+                    jedMjere = s.optString("jedMjere", "kom"),
                 )
             }
             val racun = Racun(

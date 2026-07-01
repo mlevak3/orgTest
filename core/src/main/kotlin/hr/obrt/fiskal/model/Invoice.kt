@@ -38,7 +38,13 @@ data class Stavka(
     val neto: BigDecimal,
     val pdvIznos: BigDecimal,
     val ukupno: BigDecimal,
-)
+    /** Jedinica mjere (npr. kom, kg, h) — samo za prikaz na ispisu, ne šalje se u fiskalizaciju. */
+    val jedMjere: String = "kom",
+) {
+    /** Bruto jedinična cijena (s PDV-om), izvedena iz ukupnog iznosa i količine — za prikaz na ispisu. */
+    fun jedinicnaCijena(): BigDecimal =
+        if (kolicina.signum() != 0) ukupno.divide(kolicina, 2, java.math.RoundingMode.HALF_UP) else ukupno
+}
 
 /** Zaglavlje računa — fiksni podaci obveznika i poslovnog prostora. */
 data class Zaglavlje(
