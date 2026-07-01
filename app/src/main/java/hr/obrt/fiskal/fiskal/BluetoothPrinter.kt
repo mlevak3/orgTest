@@ -3,6 +3,7 @@ package hr.obrt.fiskal.fiskal
 import android.annotation.SuppressLint
 import android.bluetooth.BluetoothAdapter
 import android.bluetooth.BluetoothDevice
+import android.bluetooth.BluetoothSocket
 import android.content.Context
 import java.util.UUID
 
@@ -13,6 +14,12 @@ data class PairedDevice(val name: String, val address: String)
  * Ispis na Bluetooth POS termalni pisač (npr. Bixolon SPP-R200II) preko
  * klasičnog Bluetootha (SPP — Serial Port Profile). Pisač se prvo mora upariti
  * s telefonom kroz Android postavke; ovdje se samo bira od već uparenih.
+ *
+ * Mnogi jeftiniji/POS termalni pisači ne odgovaraju ispravno na Androidov SDP
+ * upit za standardni SPP UUID, pa `createRfcommSocketToServiceRecord()` zna
+ * baciti "read failed, socket might closed" — stoga se, ako standardni pristup
+ * ne uspije, koristi dobro poznati fallback: refleksijom otvoren RFCOMM kanal 1
+ * (isti trik koriste gotovo svi Android ESC/POS printer SDK-ovi, uklj. proizvođačke).
  */
 object BluetoothPrinter {
 
@@ -48,17 +55,46 @@ object BluetoothPrinter {
             return Result.failure(IllegalArgumentException("Neispravna adresa pisača: ${e.message}"))
         }
 
-        return try {
-            val socket = device.createRfcommSocketToServiceRecord(SPP_UUID)
-            adapter.cancelDiscovery()
-            socket.use {
-                it.connect()
-                it.outputStream.write(bytes)
-                it.outputStream.flush()
-            }
-            Result.success(Unit)
-        } catch (e: Exception) {
-            Result.failure(IllegalStateException("Ispis nije uspio: ${e.message ?: e.javaClass.simpleName}"))
+        adapter.cancelDiscovery()
+
+        // 1) Standardni pristup (SDP upit za SPP UUID).
+        val standardno = pokusajSpojiIPoslati(device, bytes) { device.createRfcommSocketToServiceRecord(SPP_UUID) }
+        if (standardno.isSuccess) return standardno
+
+        // 2) Fallback: izravno otvori RFCOMM kanal 1 (zaobilazi SDP; radi na većini POS pisača
+        //    koji ne odgovaraju ispravno na standardni upit).
+        val fallback = pokusajSpojiIPoslati(device, bytes) { createRfcommSocketKanal(device, 1) }
+        if (fallback.isSuccess) return fallback
+
+        return Result.failure(
+            IllegalStateException(
+                "Ispis nije uspio ni standardnim ni fallback načinom.\n" +
+                    "Standardni: ${standardno.exceptionOrNull()?.message}\n" +
+                    "Fallback (kanal 1): ${fallback.exceptionOrNull()?.message}"
+            )
+        )
+    }
+
+    @SuppressLint("MissingPermission")
+    private inline fun pokusajSpojiIPoslati(
+        device: BluetoothDevice,
+        bytes: ByteArray,
+        stvoriSocket: () -> BluetoothSocket,
+    ): Result<Unit> = try {
+        val socket = stvoriSocket()
+        socket.use {
+            it.connect()
+            it.outputStream.write(bytes)
+            it.outputStream.flush()
         }
+        Result.success(Unit)
+    } catch (e: Exception) {
+        Result.failure(IllegalStateException(e.message ?: e.javaClass.simpleName))
+    }
+
+    /** Otvara RFCOMM utičnicu na fiksnom kanalu refleksijom (skrivena metoda BluetoothDevice-a). */
+    private fun createRfcommSocketKanal(device: BluetoothDevice, kanal: Int): BluetoothSocket {
+        val m = device.javaClass.getMethod("createRfcommSocket", Int::class.javaPrimitiveType)
+        return m.invoke(device, kanal) as BluetoothSocket
     }
 }

@@ -137,11 +137,24 @@ class FiskalClient(
             .post(soap.toRequestBody(XML_MEDIA))
             .build()
         return try {
-            http.newCall(request).execute().use {
-                val body = it.body?.string().orEmpty()
+            http.newCall(request).execute().use { resp ->
+                val body = resp.body?.string().orEmpty()
                 val m = echoRegex.find(body)
-                if (m != null) Result.success(m.groupValues[1])
-                else Result.failure(Exception("Neočekivan odgovor (HTTP ${it.code}): ${body.take(200)}"))
+                when {
+                    m != null -> Result.success(m.groupValues[1])
+                    body.isBlank() -> Result.failure(
+                        Exception("CIS je vratio prazan odgovor (HTTP ${resp.code}). Veza/TLS rade, ali echo servis nije vratio sadržaj.")
+                    )
+                    else -> {
+                        val fault = faultRegex.find(body)?.groupValues?.get(1)
+                        Result.failure(
+                            Exception(
+                                if (fault != null) "SOAP greška: $fault"
+                                else "Neočekivan odgovor (HTTP ${resp.code}): ${body.take(800)}"
+                            )
+                        )
+                    }
+                }
             }
         } catch (e: Exception) {
             Result.failure(Exception(opisMrezne(e)))
@@ -192,7 +205,8 @@ class FiskalClient(
     companion object {
         private val XML_MEDIA = "text/xml; charset=utf-8".toMediaType()
         private val jirRegex = Regex("<(?:\\w+:)?Jir>([^<]+)</")
-        private val echoRegex = Regex("<(?:\\w+:)?EchoResponse>([^<]*)</")
+        private val echoRegex = Regex("<(?:\\w+:)?EchoResponse[^>]*>([^<]*)</", RegexOption.IGNORE_CASE)
+        private val faultRegex = Regex("<(?:\\w+:)?[Ff]ault[Ss]tring[^>]*>([^<]*)</")
         private val sifraRegex = Regex("<(?:\\w+:)?SifraGreske>([^<]+)</")
         private val porukaRegex = Regex("<(?:\\w+:)?PorukaGreske>([^<]+)</")
     }

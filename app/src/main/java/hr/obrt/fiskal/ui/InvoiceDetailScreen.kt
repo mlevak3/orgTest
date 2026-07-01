@@ -95,27 +95,31 @@ fun InvoiceDetailScreen(vm: AppViewModel, onBack: () -> Unit, onCopy: () -> Unit
                 }
             }
             item {
+                val printer = vm.printerAddressFor(si.companyId)
+                var isprint by remember { mutableStateOf(false) }
+                var printPoruka by remember { mutableStateOf<String?>(null) }
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     OutlinedButton(onClick = { InvoiceShare.sharePdf(ctx, data) }, modifier = Modifier.weight(1f)) { Text("Podijeli") }
-                    val printer = vm.printerAddressFor(si.companyId)
-                    var isprint by remember { mutableStateOf(false) }
                     OutlinedButton(
                         enabled = printer != null && !isprint,
                         onClick = {
                             val addr = printer
                             if (addr != null) {
                                 isprint = true
+                                printPoruka = null
                                 vm.viewModelScope.launch {
                                     val res = withContext(Dispatchers.IO) {
                                         BluetoothPrinter.posalji(ctx, addr, EscPosReceiptBuilder.build(data))
                                     }
                                     isprint = false
+                                    printPoruka = res.fold({ "Poslano na pisač." }, { "Ispis nije uspio: ${it.message}" })
                                 }
                             }
                         },
                         modifier = Modifier.weight(1f),
                     ) { Text(if (isprint) "Šaljem…" else "POS pisač") }
                 }
+                printPoruka?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
             }
             item {
                 val uriHandler = LocalUriHandler.current
