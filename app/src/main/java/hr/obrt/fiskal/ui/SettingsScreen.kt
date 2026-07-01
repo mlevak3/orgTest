@@ -1,3 +1,5 @@
+@file:OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
+
 package hr.obrt.fiskal.ui
 
 import android.Manifest
@@ -6,6 +8,8 @@ import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
@@ -200,9 +204,17 @@ fun SettingsScreen(vm: AppViewModel, onClose: () -> Unit) {
                     navigationIcon = { TextButton(onClick = onClose, colors = ButtonDefaults.textButtonColors(contentColor = cs.onPrimary)) { Text("Odustani") } },
                     colors = TopAppBarDefaults.topAppBarColors(containerColor = cs.primary, titleContentColor = cs.onPrimary),
                 )
-                TabRow(selectedTabIndex = tab, containerColor = cs.primaryContainer) {
+                ScrollableTabRow(
+                    selectedTabIndex = tab,
+                    containerColor = cs.primaryContainer,
+                    edgePadding = 12.dp,
+                ) {
                     TAB_NASLOVI.forEachIndexed { i, naslov ->
-                        Tab(selected = tab == i, onClick = { tab = i }, text = { Text(naslov) })
+                        Tab(
+                            selected = tab == i,
+                            onClick = { tab = i },
+                            text = { Text(naslov, maxLines = 1) },
+                        )
                     }
                 }
             }
@@ -359,7 +371,7 @@ private fun TabPodaci(
         else "Nema loga (naslov računa ostaje samo tekstualni).",
         style = MaterialTheme.typography.bodySmall,
     )
-    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Button(onClick = onUcitajLogo) { Text("Učitaj logo") }
         if (logoPostoji) OutlinedButton(onClick = onUkloniLogo) { Text("Ukloni") }
     }
@@ -495,7 +507,7 @@ private fun TabFiskalizacija(
 ) {
     Text("FINA certifikat (.p12 / .pfx)", style = MaterialTheme.typography.titleMedium)
     Text(certInfo, style = MaterialTheme.typography.bodySmall)
-    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Button(onClick = onUcitajCert) { Text("Učitaj certifikat") }
         if (certPostoji) OutlinedButton(onClick = onUkloniCert) { Text("Ukloni") }
     }
@@ -515,7 +527,7 @@ private fun TabFiskalizacija(
         "Fina Root CA + Fina RDC 2020 su već ugrađeni; uvezi samo ako FINA promijeni lanac.",
         style = MaterialTheme.typography.bodySmall,
     )
-    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Button(onClick = onUcitajCa) { Text("Učitaj CA") }
         if (caPostoji) OutlinedButton(onClick = onUkloniCa) { Text("Ukloni") }
     }
@@ -543,7 +555,7 @@ private fun TabPrinteri(
         else "Odabran: ${printerName ?: printerAddress}",
         style = MaterialTheme.typography.bodySmall,
     )
-    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Button(onClick = onOdaberi) { Text("Odaberi pisač") }
         if (printerAddress.isNotBlank()) {
             OutlinedButton(onClick = onTest) { Text("Testni ispis") }
@@ -568,7 +580,7 @@ private fun caStatus(postoji: Boolean) =
 private fun <T> EnumRedak(naslov: String, opcije: List<Pair<T, String>>, odabrano: T, naOdabir: (T) -> Unit) {
     Column {
         Text(naslov, style = MaterialTheme.typography.labelLarge)
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             opcije.forEach { (vrijednost, opis) ->
                 FilterChip(selected = odabrano == vrijednost, onClick = { naOdabir(vrijednost) }, label = { Text(opis) })
             }

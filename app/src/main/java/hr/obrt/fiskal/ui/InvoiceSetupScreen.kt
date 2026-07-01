@@ -1,6 +1,9 @@
+@file:OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
+
 package hr.obrt.fiskal.ui
 
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
@@ -49,7 +52,7 @@ fun InvoiceSetupScreen(
             Divider()
 
             Text("Poslovni prostor", style = MaterialTheme.typography.labelLarge)
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 d?.poslovniProstori?.forEach { p ->
                     FilterChip(
                         selected = vm.selectedProstor.value?.id == p.id,
@@ -60,7 +63,7 @@ fun InvoiceSetupScreen(
             }
 
             Text("Naplatni uređaj", style = MaterialTheme.typography.labelLarge)
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 vm.selectedProstor.value?.naplatniUredjaji?.forEach { u ->
                     FilterChip(
                         selected = vm.selectedUredjaj.value?.id == u.id,
