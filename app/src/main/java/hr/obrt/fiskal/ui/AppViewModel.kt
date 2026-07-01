@@ -637,13 +637,15 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     // --- Izvještaji ---
 
     /**
-     * Izračuna izvještaj za odabranu tvrtku i period (samo fiskalizirani računi).
+     * Izračuna izvještaj za odabranu tvrtku i period. Obuhvaća SVE izdane račune,
+     * fiskalizirane i nefiskalizirane — račun je izdan (ZKI izračunat, mogao je
+     * biti otisnut) i kad CIS još nije potvrdio JIR.
      * Za [PeriodIzvjestaja.PRILAGODJENO] koriste se [prilagodjenoOd]/[prilagodjenoDo]
      * (epoch millis, uključivo — dopuštaju odabir do razine minute).
      */
     fun izvjestaj(period: PeriodIzvjestaja, prilagodjenoOd: Long? = null, prilagodjenoDo: Long? = null): Izvjestaj {
         val t = selected.value ?: return Izvjestaj(0, BigDecimal.ZERO, emptyList(), emptyList(), emptyList())
-        val svi = invoiceStore.zaTvrtku(t.id).filter { it.jir != null }
+        val svi = invoiceStore.zaTvrtku(t.id)
         val filtrirano = if (period == PeriodIzvjestaja.PRILAGODJENO) {
             svi.filter { si ->
                 (prilagodjenoOd == null || si.createdAt >= prilagodjenoOd) &&
