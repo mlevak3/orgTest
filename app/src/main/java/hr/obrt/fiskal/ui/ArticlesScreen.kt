@@ -13,7 +13,6 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -28,6 +27,7 @@ import androidx.compose.ui.unit.dp
 import hr.obrt.fiskal.data.Artikl
 import hr.obrt.fiskal.ui.components.FiskalCard
 import hr.obrt.fiskal.ui.components.FiskalEmptyState
+import hr.obrt.fiskal.ui.components.FiskalInput
 import hr.obrt.fiskal.ui.components.FiskalTerracottaButton
 import hr.obrt.fiskal.ui.components.IconTile
 import hr.obrt.fiskal.ui.components.LightHeader
@@ -120,18 +120,18 @@ private fun ArtiklDialog(vm: AppViewModel) {
         onDismissRequest = { vm.editingArticle.value = null },
         title = { Text(if (postoji) "Uredi artikl" else "Novi artikl") },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedTextField(naziv, { naziv = it }, label = { Text("Naziv") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                FiskalInput(naziv, { naziv = it }, "Naziv artikla", Modifier.fillMaxWidth(), placeholder = "npr. Med bagremov")
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    OutlinedTextField(jed, { jed = it }, label = { Text("Jed. mjere") }, singleLine = true, modifier = Modifier.weight(1f))
-                    OutlinedTextField(
-                        stopa, { stopa = it }, label = { Text("PDV %") }, singleLine = true,
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal), modifier = Modifier.weight(1f),
+                    FiskalInput(jed, { jed = it }, "Jed. mjere", Modifier.weight(1f), placeholder = "kom")
+                    FiskalInput(
+                        stopa, { stopa = it }, "PDV %", Modifier.weight(1f),
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                     )
                 }
-                OutlinedTextField(
-                    cijena, { cijena = it }, label = { Text("Cijena (neto, €)") }, singleLine = true,
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal), modifier = Modifier.fillMaxWidth(),
+                FiskalInput(
+                    cijena, { cijena = it }, "Cijena (neto, €)", Modifier.fillMaxWidth(),
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                 )
             }
         },

@@ -186,6 +186,40 @@ fun IconTile(icon: ImageVector, terakota: Boolean = false, size: Dp = 44.dp) {
     }
 }
 
+/**
+ * Input polje — BRAND-UPUTE 8.7: ispunjena podloga (bgAlt) + vidljiv rub, radius 16,
+ * fokus rub olive. Ispunjena podloga jasno razlikuje polje za unos od običnog teksta
+ * (bitno u dijalozima čija je pozadina ista "surface" boja).
+ */
+@Composable
+fun FiskalInput(
+    value: String,
+    onChange: (String) -> Unit,
+    label: String,
+    modifier: Modifier = Modifier,
+    singleLine: Boolean = true,
+    placeholder: String? = null,
+    keyboardOptions: androidx.compose.foundation.text.KeyboardOptions = androidx.compose.foundation.text.KeyboardOptions.Default,
+) {
+    val t = LocalFiskalTokens.current
+    OutlinedTextField(
+        value = value,
+        onValueChange = onChange,
+        label = { Text(label) },
+        placeholder = placeholder?.let { { Text(it, color = t.placeholder) } },
+        singleLine = singleLine,
+        keyboardOptions = keyboardOptions,
+        shape = RoundedCornerShape(FiskalRadius.input),
+        colors = OutlinedTextFieldDefaults.colors(
+            focusedContainerColor = t.bgAlt, unfocusedContainerColor = t.bgAlt,
+            focusedBorderColor = t.olive, unfocusedBorderColor = t.borderStrong,
+            focusedLabelColor = t.olive, unfocusedLabelColor = t.mutedSoft,
+            cursorColor = t.olive,
+        ),
+        modifier = modifier,
+    )
+}
+
 /** Search pill — BRAND-UPUTE 8.8. */
 @Composable
 fun SearchPill(value: String, onChange: (String) -> Unit, placeholder: String, modifier: Modifier = Modifier) {

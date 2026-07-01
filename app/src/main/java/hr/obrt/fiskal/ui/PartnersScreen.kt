@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Edit
 import androidx.compose.material.icons.rounded.Group
@@ -12,7 +13,6 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -24,9 +24,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import hr.obrt.fiskal.data.Partner
 import hr.obrt.fiskal.ui.components.FiskalCard
+import hr.obrt.fiskal.ui.components.FiskalInput
 import hr.obrt.fiskal.ui.components.FiskalEmptyState
 import hr.obrt.fiskal.ui.components.FiskalTerracottaButton
 import hr.obrt.fiskal.ui.components.LightHeader
@@ -96,10 +98,11 @@ fun PartnersScreen(vm: AppViewModel, onPick: ((Partner) -> Unit)?, onBack: () ->
             }
         }
 
+        // Podignut iznad donje navigacije (ona se crta preko ovog ekrana) da ostane vidljiv.
         FiskalTerracottaButton(
             "Novi partner",
             onClick = { vm.newPartner() },
-            modifier = Modifier.align(Alignment.BottomEnd).padding(FiskalSpacing.screenX),
+            modifier = Modifier.align(Alignment.BottomEnd).padding(end = FiskalSpacing.screenX, bottom = FiskalSpacing.listPad),
         )
     }
 
@@ -138,13 +141,13 @@ private fun PartnerDialog(vm: AppViewModel) {
         onDismissRequest = { vm.editingPartner.value = null },
         title = { Text(if (postoji) "Uredi partnera" else "Novi partner") },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedTextField(naziv, { naziv = it }, label = { Text("Naziv") }, singleLine = true, modifier = Modifier.fillMaxWidth())
-                OutlinedTextField(
-                    oib, { oib = it.filter(Char::isDigit).take(11) },
-                    label = { Text("OIB") }, singleLine = true, modifier = Modifier.fillMaxWidth(),
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                FiskalInput(naziv, { naziv = it }, "Naziv / ime partnera", Modifier.fillMaxWidth(), placeholder = "npr. Konoba Galeb j.d.o.o.")
+                FiskalInput(
+                    oib, { oib = it.filter(Char::isDigit).take(11) }, "OIB (11 znamenki)", Modifier.fillMaxWidth(),
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                 )
-                OutlinedTextField(adresa, { adresa = it }, label = { Text("Adresa") }, modifier = Modifier.fillMaxWidth())
+                FiskalInput(adresa, { adresa = it }, "Adresa", Modifier.fillMaxWidth(), singleLine = false, placeholder = "npr. Obala 12, Split")
             }
         },
         confirmButton = {

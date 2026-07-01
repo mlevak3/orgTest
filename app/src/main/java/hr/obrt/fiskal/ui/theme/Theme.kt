@@ -188,7 +188,7 @@ fun FiskalTheme(tema: hr.obrt.fiskal.data.TemaAplikacije = hr.obrt.fiskal.data.T
             background = tokens.bg, onBackground = tokens.ink,
             surface = tokens.surface, onSurface = tokens.ink,
             surfaceVariant = tokens.surfaceSunken, onSurfaceVariant = tokens.muted,
-            outline = tokens.border, outlineVariant = tokens.borderStrong,
+            outline = tokens.borderStrong, outlineVariant = tokens.border,
             error = tokens.error, onError = tokens.terracottaInk,
             errorContainer = tokens.errorBg, onErrorContainer = tokens.error,
         )
@@ -203,7 +203,7 @@ fun FiskalTheme(tema: hr.obrt.fiskal.data.TemaAplikacije = hr.obrt.fiskal.data.T
             background = tokens.bg, onBackground = tokens.ink,
             surface = tokens.surface, onSurface = tokens.ink,
             surfaceVariant = tokens.surfaceSunken, onSurfaceVariant = tokens.muted,
-            outline = tokens.border, outlineVariant = tokens.borderStrong,
+            outline = tokens.borderStrong, outlineVariant = tokens.border,
             error = tokens.error, onError = tokens.terracottaInk,
             errorContainer = tokens.errorBg, onErrorContainer = tokens.error,
         )
