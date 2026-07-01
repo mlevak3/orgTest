@@ -1,5 +1,6 @@
 package hr.obrt.fiskal.ui
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -40,12 +41,17 @@ fun InvoiceScreen(
     val ishod = vm.ishod.value
     val tvrtka = vm.selected.value
     var meniOtvoren by remember { mutableStateOf(false) }
+    var potvrdaIzlaza by remember { mutableStateOf(false) }
+    var potvrdaFiskal by remember { mutableStateOf(false) }
+
+    val izlaz: () -> Unit = { if (ishod == null && vm.imaUnos()) potvrdaIzlaza = true else onHome() }
+    BackHandler { izlaz() }
 
     Scaffold(
         topBar = {
             TopAppBar(
                 title = { Text(if (ishod != null) "Račun fiskaliziran" else "Novi račun", maxLines = 1) },
-                navigationIcon = { TextButton(onClick = onHome) { Text("Početna") } },
+                navigationIcon = { TextButton(onClick = izlaz) { Text("Početna") } },
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = MaterialTheme.colorScheme.primary,
                     titleContentColor = MaterialTheme.colorScheme.onPrimary,
@@ -67,7 +73,7 @@ fun InvoiceScreen(
         },
         floatingActionButton = {
             if (ishod == null) ExtendedFloatingActionButton(
-                onClick = { vm.fiskaliziraj() },
+                onClick = { if (!vm.ucitavanje.value) potvrdaFiskal = true },
                 icon = { if (vm.ucitavanje.value) CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp) },
                 text = { Text(if (vm.ucitavanje.value) "Šaljem…" else "Fiskaliziraj") },
             )
@@ -75,6 +81,36 @@ fun InvoiceScreen(
     ) { pad ->
         if (ishod != null) ResultView(vm, Modifier.padding(pad))
         else InvoiceForm(vm, tvrtka, Modifier.padding(pad), onPickArticle)
+    }
+
+    if (potvrdaIzlaza) AlertDialog(
+        onDismissRequest = { potvrdaIzlaza = false },
+        title = { Text("Napustiti račun?") },
+        text = { Text("Uneseni podaci nisu fiskalizirani i neće biti spremljeni.") },
+        confirmButton = { TextButton(onClick = { potvrdaIzlaza = false; onHome() }) { Text("Napusti") } },
+        dismissButton = { TextButton(onClick = { potvrdaIzlaza = false }) { Text("Ostani") } },
+    )
+
+    if (potvrdaFiskal) {
+        val produkcija = tvrtka?.okolina == hr.obrt.fiskal.fiskal.FiskalOkolina.PRODUKCIJA
+        AlertDialog(
+            onDismissRequest = { potvrdaFiskal = false },
+            title = { Text(if (vm.storno.value) "Fiskalizirati STORNO?" else "Fiskalizirati račun?") },
+            text = {
+                Column {
+                    Text("Stavki: ${vm.stavke.count { it.naziv.isNotBlank() }} · Ukupno: ${vm.ukupno().toPlainString()} €")
+                    if (vm.kupacNaziv.value.isNotBlank()) Text("Kupac: ${vm.kupacNaziv.value}")
+                    Spacer(Modifier.height(6.dp))
+                    Text(
+                        if (produkcija) "PRODUKCIJA — ovo je PRAVA fiskalizacija." else "TEST okolina.",
+                        color = if (produkcija) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary,
+                        fontWeight = FontWeight.SemiBold,
+                    )
+                }
+            },
+            confirmButton = { TextButton(onClick = { potvrdaFiskal = false; vm.fiskaliziraj() }) { Text("Fiskaliziraj") } },
+            dismissButton = { TextButton(onClick = { potvrdaFiskal = false }) { Text("Odustani") } },
+        )
     }
 }
 

@@ -1,0 +1,14 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- Bijeli račun sa nazubljenim dnom -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M40,28 L72,28 L72,74 L68,78 L64,74 L60,78 L56,74 L52,78 L48,74 L44,78 L40,74 Z" />
+    <!-- Stavke (teal linije) -->
+    <path android:fillColor="#006A6B" android:pathData="M45,38 L67,38 L67,41 L45,41 Z" />
+    <path android:fillColor="#006A6B" android:pathData="M45,46 L67,46 L67,49 L45,49 Z" />
+    <path android:fillColor="#006A6B" android:pathData="M45,54 L60,54 L60,57 L45,57 Z" />
+</vector>

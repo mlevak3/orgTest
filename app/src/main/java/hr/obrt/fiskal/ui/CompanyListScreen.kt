@@ -21,12 +21,14 @@ fun CompanyListScreen(
 ) {
     Scaffold(
         topBar = {
+            val cs = MaterialTheme.colorScheme
             TopAppBar(
                 title = { Text("Odaberi tvrtku") },
                 navigationIcon = {
-                    if (onBack != null) TextButton(onClick = onBack) { Text("Natrag") }
+                    if (onBack != null) TextButton(onClick = onBack, colors = ButtonDefaults.textButtonColors(contentColor = cs.onPrimary)) { Text("Natrag") }
                 },
-                actions = { TextButton(onClick = onAdd) { Text("Dodaj") } },
+                actions = { TextButton(onClick = onAdd, colors = ButtonDefaults.textButtonColors(contentColor = cs.onPrimary)) { Text("Dodaj") } },
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = cs.primary, titleContentColor = cs.onPrimary),
             )
         }
     ) { pad ->

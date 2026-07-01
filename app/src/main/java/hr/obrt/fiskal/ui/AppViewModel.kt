@@ -155,6 +155,11 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         return if (storno.value) base.negate() else base
     }
 
+    /** Ima li obrazac nespremljenog unosa (za potvrdu izlaza). */
+    fun imaUnos(): Boolean =
+        stavke.any { it.naziv.isNotBlank() || parse(it.ukupno).signum() != 0 } ||
+            kupacNaziv.value.isNotBlank() || kupacOib.value.isNotBlank() || napomena.value.isNotBlank()
+
     fun fiskaliziraj() {
         greska.value = null
         ishod.value = null

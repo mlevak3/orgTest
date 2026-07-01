@@ -15,15 +15,21 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import hr.obrt.fiskal.data.Tvrtka
+import hr.obrt.fiskal.fiskal.CaStore
 import hr.obrt.fiskal.fiskal.FiskalCertificate
+import hr.obrt.fiskal.fiskal.FiskalClient
 import hr.obrt.fiskal.fiskal.FiskalOkolina
 import hr.obrt.fiskal.fiskal.TlsTrust
 import hr.obrt.fiskal.model.OznSlijed
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SettingsScreen(vm: AppViewModel, onClose: () -> Unit) {
     val ctx = LocalContext.current
+    val scope = rememberCoroutineScope()
     val store = vm.companyStore
     val company = remember { vm.editing.value ?: Tvrtka().also { vm.editing.value = it } }
     val postoji = vm.companies.any { it.id == company.id }
@@ -75,9 +81,11 @@ fun SettingsScreen(vm: AppViewModel, onClose: () -> Unit) {
 
     Scaffold(
         topBar = {
+            val cs = MaterialTheme.colorScheme
             TopAppBar(
                 title = { Text(if (postoji) "Uredi tvrtku" else "Nova tvrtka") },
-                navigationIcon = { TextButton(onClick = onClose) { Text("Odustani") } },
+                navigationIcon = { TextButton(onClick = onClose, colors = ButtonDefaults.textButtonColors(contentColor = cs.onPrimary)) { Text("Odustani") } },
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = cs.primary, titleContentColor = cs.onPrimary),
             )
         }
     ) { pad ->
@@ -160,6 +168,24 @@ fun SettingsScreen(vm: AppViewModel, onClose: () -> Unit) {
                     Spacer(Modifier.width(8.dp)); Text("Zanemari TLS provjeru (samo TEST)")
                 }
             }
+            OutlinedButton(
+                onClick = {
+                    val okol = okolina
+                    val tls = ignoreTls
+                    poruka = "Testiram vezu…"
+                    scope.launch {
+                        val res = withContext(Dispatchers.IO) {
+                            val ca = CaStore.loadExtraCas(ctx, store.caBytes(company.id))
+                            FiskalClient(okol, tls, ca).echo("test")
+                        }
+                        poruka = res.fold(
+                            onSuccess = { "Veza OK (${okol.opis}). Odgovor: \"$it\"" },
+                            onFailure = { "Test veze nije uspio: ${it.message}" },
+                        )
+                    }
+                },
+                modifier = Modifier.fillMaxWidth(),
+            ) { Text("Test veze (Echo)") }
             OutlinedTextField(
                 value = broj, onValueChange = { broj = it.filter(Char::isDigit) },
                 label = { Text("Sljedeći broj računa (BrOznRac)") },

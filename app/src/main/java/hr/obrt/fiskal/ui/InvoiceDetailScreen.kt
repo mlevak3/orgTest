@@ -35,7 +35,8 @@ fun InvoiceDetailScreen(vm: AppViewModel, onBack: () -> Unit, onCopy: () -> Unit
         topBar = {
             TopAppBar(
                 title = { Text("Račun ${si.brojRacuna()}") },
-                navigationIcon = { TextButton(onClick = onBack) { Text("Natrag") } },
+                navigationIcon = { TextButton(onClick = onBack, colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.onPrimary)) { Text("Natrag") } },
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.primary, titleContentColor = MaterialTheme.colorScheme.onPrimary),
             )
         }
     ) { pad ->

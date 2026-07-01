@@ -31,8 +31,9 @@ class MainActivity : ComponentActivity() {
                     mutableStateOf(if (vm.selected.value == null) Screen.CompanyList else Screen.Home)
                 }
 
-                // Sustavski "natrag" vodi na početnu (osim na početnoj/odabiru tvrtke).
-                BackHandler(enabled = screen != Screen.Home && screen != Screen.CompanyList) {
+                // Sustavski "natrag" vodi na početnu (osim na početnoj/odabiru tvrtke;
+                // Invoice ima vlastitu potvrdu izlaza).
+                BackHandler(enabled = screen != Screen.Home && screen != Screen.CompanyList && screen != Screen.Invoice) {
                     screen = when (screen) {
                         Screen.Detail -> Screen.History
                         else -> Screen.Home

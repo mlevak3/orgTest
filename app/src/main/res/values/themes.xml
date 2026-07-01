@@ -1,5 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- Compose upravlja izgledom; ovdje je samo bazna platforma bez action bara. -->
-    <style name="Theme.FiskalObrt" parent="@android:style/Theme.Material.Light.NoActionBar" />
+    <!-- Compose upravlja izgledom; ovdje je bazna platforma bez action bara,
+         obojani status bar i teal pozadina prozora (ljepši splash na pokretanju). -->
+    <style name="Theme.FiskalObrt" parent="@android:style/Theme.Material.Light.NoActionBar">
+        <item name="android:statusBarColor">@color/brand</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:windowBackground">@color/brand</item>
+    </style>
 </resources>

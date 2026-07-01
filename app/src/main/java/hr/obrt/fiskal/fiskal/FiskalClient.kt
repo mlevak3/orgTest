@@ -124,6 +124,30 @@ class FiskalClient(
         )
     }
 
+    /** Provjera veze/TLS-a preko EchoRequesta (ne zahtijeva potpis/certifikat). */
+    fun echo(text: String = "test"): Result<String> {
+        val soap = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>" +
+            "<soapenv:Envelope xmlns:soapenv=\"http://schemas.xmlsoap.org/soap/envelope/\">" +
+            "<soapenv:Body><tns:EchoRequest xmlns:tns=\"${RacunXmlBuilder.F73_NS}\">$text</tns:EchoRequest></soapenv:Body>" +
+            "</soapenv:Envelope>"
+        val request = Request.Builder()
+            .url(okolina.url)
+            .addHeader("Content-Type", "text/xml; charset=UTF-8")
+            .addHeader("SOAPAction", "")
+            .post(soap.toRequestBody(XML_MEDIA))
+            .build()
+        return try {
+            http.newCall(request).execute().use {
+                val body = it.body?.string().orEmpty()
+                val m = echoRegex.find(body)
+                if (m != null) Result.success(m.groupValues[1])
+                else Result.failure(Exception("Neočekivan odgovor (HTTP ${it.code}): ${body.take(200)}"))
+            }
+        } catch (e: Exception) {
+            Result.failure(Exception(opisMrezne(e)))
+        }
+    }
+
     private fun opisMrezne(e: Exception): String = when (e) {
         is javax.net.ssl.SSLHandshakeException ->
             "TLS: certifikat poslužitelja nije prihvaćen (učitaj FINA CA u Postavkama). ${e.message}"
@@ -168,6 +192,7 @@ class FiskalClient(
     companion object {
         private val XML_MEDIA = "text/xml; charset=utf-8".toMediaType()
         private val jirRegex = Regex("<(?:\\w+:)?Jir>([^<]+)</")
+        private val echoRegex = Regex("<(?:\\w+:)?EchoResponse>([^<]*)</")
         private val sifraRegex = Regex("<(?:\\w+:)?SifraGreske>([^<]+)</")
         private val porukaRegex = Regex("<(?:\\w+:)?PorukaGreske>([^<]+)</")
     }

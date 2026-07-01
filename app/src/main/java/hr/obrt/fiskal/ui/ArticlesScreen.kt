@@ -21,9 +21,11 @@ import java.math.BigDecimal
 fun ArticlesScreen(vm: AppViewModel, onPick: ((Artikl) -> Unit)?, onBack: () -> Unit) {
     Scaffold(
         topBar = {
+            val cs = MaterialTheme.colorScheme
             TopAppBar(
                 title = { Text(if (onPick != null) "Odaberi artikl" else "Šifrarnik artikala") },
-                navigationIcon = { TextButton(onClick = onBack) { Text("Natrag") } },
+                navigationIcon = { TextButton(onClick = onBack, colors = ButtonDefaults.textButtonColors(contentColor = cs.onPrimary)) { Text("Natrag") } },
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = cs.primary, titleContentColor = cs.onPrimary),
             )
         },
         floatingActionButton = {
