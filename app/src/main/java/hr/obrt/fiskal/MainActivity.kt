@@ -61,7 +61,12 @@ class MainActivity : ComponentActivity() {
 
                 val onNewInvoice = {
                     vm.pripremiNoviRacun()
-                    screen = if (vm.trebaOdabirDjelatnosti()) Screen.ActivityPicker else Screen.InvoiceSetup
+                    screen = when {
+                        vm.trebaOdabirDjelatnosti() -> Screen.ActivityPicker
+                        vm.trebaPostavkeRacuna() -> Screen.InvoiceSetup
+                        // Jedna djelatnost s jednim prostorom i uređajem — ravno na unos stavki.
+                        else -> Screen.Invoice
+                    }
                 }
 
                 Box(Modifier.fillMaxSize()) {
@@ -97,7 +102,10 @@ class MainActivity : ComponentActivity() {
 
                     Screen.ActivityPicker -> ActivityPickerScreen(
                         vm,
-                        onPicked = { vm.odaberiDjelatnost(it); screen = Screen.InvoiceSetup },
+                        onPicked = {
+                            vm.odaberiDjelatnost(it)
+                            screen = if (vm.trebaPostavkeRacuna()) Screen.InvoiceSetup else Screen.Invoice
+                        },
                         onBack = { screen = Screen.Home },
                     )
 

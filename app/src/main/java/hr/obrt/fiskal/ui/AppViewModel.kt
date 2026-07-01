@@ -170,6 +170,18 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     /** Treba li prikazati zaseban ekran odabira djelatnosti (>1 djelatnost). */
     fun trebaOdabirDjelatnosti(): Boolean = (selected.value?.djelatnosti?.size ?: 0) > 1
 
+    /**
+     * Treba li ekran potvrde prostora/uređaja/broja prije unosa stavki: preskače
+     * se kad odabrana djelatnost ima točno jedan poslovni prostor s jednim
+     * naplatnim uređajem (nema se što birati; predloženi broj se ionako vidi
+     * i može promijeniti tek u iznimnim situacijama).
+     */
+    fun trebaPostavkeRacuna(): Boolean {
+        val d = selectedDjelatnost.value ?: return true
+        if (d.poslovniProstori.size > 1) return true
+        return d.poslovniProstori.first().naplatniUredjaji.size > 1
+    }
+
     /** Postavlja zadanu djelatnost tvrtke (i njome zadani prostor/uređaj/broj) te čisti obrazac. */
     fun pripremiNoviRacun() {
         val t = selected.value ?: return
