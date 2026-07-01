@@ -1,9 +1,17 @@
 package hr.obrt.fiskal.ui
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.slideInVertically
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Assessment
 import androidx.compose.material.icons.filled.Brightness4
 import androidx.compose.material.icons.filled.Brightness6
 import androidx.compose.material.icons.filled.Brightness7
@@ -12,13 +20,22 @@ import androidx.compose.material.icons.filled.CloudUpload
 import androidx.compose.material.icons.filled.Groups
 import androidx.compose.material.icons.filled.List
 import androidx.compose.material.icons.filled.Print
+import androidx.compose.material.icons.filled.Receipt
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.ShoppingCart
+import androidx.compose.material.icons.filled.TrendingUp
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
@@ -46,6 +63,7 @@ fun HomeScreen(
     onSettings: () -> Unit,
     onCompanies: () -> Unit,
     onBackup: () -> Unit,
+    onReports: () -> Unit,
     onOpenInvoice: (SavedInvoice) -> Unit,
 ) {
     val cs = MaterialTheme.colorScheme
@@ -78,41 +96,52 @@ fun HomeScreen(
             )
         }
     ) { pad ->
+        var prikazano by remember { mutableStateOf(false) }
+        LaunchedEffect(Unit) { prikazano = true }
+
         Column(
             Modifier.padding(pad).fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            // Odabrana tvrtka
-            Card(
-                colors = CardDefaults.cardColors(containerColor = cs.primaryContainer, contentColor = cs.onPrimaryContainer),
-                modifier = Modifier.fillMaxWidth(),
+            // Odabrana tvrtka — gradijentna hero kartica
+            AnimatedVisibility(
+                visible = prikazano,
+                enter = fadeIn(tween(400)) + slideInVertically(tween(400)) { -it / 3 },
             ) {
-                Row(Modifier.padding(16.dp).fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.Filled.Business, null, Modifier.size(30.dp))
-                    Spacer(Modifier.width(12.dp))
-                    Column(Modifier.weight(1f)) {
-                        Text("ODABRANA TVRTKA", style = MaterialTheme.typography.labelSmall)
-                        Text(tvrtka?.opis() ?: "—", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, maxLines = 1)
-                        Text(
-                            "OIB ${tvrtka?.oib ?: "—"} · ${tvrtka?.okolina?.opis ?: ""}",
-                            style = MaterialTheme.typography.bodySmall,
-                        )
+                Box(
+                    Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(24.dp))
+                        .background(Brush.linearGradient(listOf(cs.primary, cs.tertiary)))
+                ) {
+                    Row(Modifier.padding(18.dp).fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                        Box(
+                            Modifier.size(48.dp).clip(CircleShape).background(cs.onPrimary.copy(alpha = 0.18f)),
+                            contentAlignment = Alignment.Center,
+                        ) { Icon(Icons.Filled.Business, null, tint = cs.onPrimary) }
+                        Spacer(Modifier.width(14.dp))
+                        Column(Modifier.weight(1f)) {
+                            Text("ODABRANA TVRTKA", style = MaterialTheme.typography.labelSmall, color = cs.onPrimary.copy(alpha = 0.8f))
+                            Text(tvrtka?.opis() ?: "—", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, maxLines = 1, color = cs.onPrimary)
+                            Text(
+                                "OIB ${tvrtka?.oib ?: "—"} · ${tvrtka?.okolina?.opis ?: ""}",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = cs.onPrimary.copy(alpha = 0.85f),
+                            )
+                        }
+                        TextButton(onClick = onCompanies, colors = ButtonDefaults.textButtonColors(contentColor = cs.onPrimary)) { Text("Promijeni") }
                     }
-                    TextButton(onClick = onCompanies) { Text("Promijeni") }
                 }
             }
 
             // Promet danas
-            Card(Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = cs.secondaryContainer, contentColor = cs.onSecondaryContainer)) {
-                Row(Modifier.padding(16.dp).fillMaxWidth()) {
-                    Column(Modifier.weight(1f)) {
-                        Text("Računa danas", style = MaterialTheme.typography.labelMedium)
-                        Text("$brojDanas", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
-                    }
-                    Column(Modifier.weight(1f)) {
-                        Text("Promet danas", style = MaterialTheme.typography.labelMedium)
-                        Text("${prometDanas.toPlainString()} €", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
-                    }
+            AnimatedVisibility(
+                visible = prikazano,
+                enter = fadeIn(tween(450, delayMillis = 80)) + slideInVertically(tween(450, delayMillis = 80)) { it / 3 },
+            ) {
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    StatKartica("Računa danas", "$brojDanas", Icons.Filled.Receipt, cs.secondaryContainer, cs.onSecondaryContainer, Modifier.weight(1f))
+                    StatKartica("Promet danas", "${prometDanas.toPlainString()} €", Icons.Filled.TrendingUp, cs.tertiaryContainer, cs.onTertiaryContainer, Modifier.weight(1f))
                 }
             }
 
@@ -148,15 +177,42 @@ fun HomeScreen(
             }
 
             // Brze radnje — mreža
-            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                MenuPlocica("Računi", Icons.Filled.List, cs.secondaryContainer, cs.onSecondaryContainer, Modifier.weight(1f), onHistory)
-                MenuPlocica("Šifrarnik", Icons.Filled.ShoppingCart, cs.tertiaryContainer, cs.onTertiaryContainer, Modifier.weight(1f), onArticles)
+            AnimatedVisibility(
+                visible = prikazano,
+                enter = fadeIn(tween(500, delayMillis = 160)) + slideInVertically(tween(500, delayMillis = 160)) { it / 3 },
+            ) {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        MenuPlocica("Računi", Icons.Filled.List, cs.secondaryContainer, cs.onSecondaryContainer, Modifier.weight(1f), onHistory)
+                        MenuPlocica("Šifrarnik", Icons.Filled.ShoppingCart, cs.tertiaryContainer, cs.onTertiaryContainer, Modifier.weight(1f), onArticles)
+                    }
+                    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        MenuPlocica("Partneri", Icons.Filled.Groups, cs.tertiaryContainer, cs.onTertiaryContainer, Modifier.weight(1f), onPartners)
+                        MenuPlocica("Izvještaji", Icons.Filled.Assessment, cs.secondaryContainer, cs.onSecondaryContainer, Modifier.weight(1f), onReports)
+                    }
+                    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        MenuPlocica("Postavke", Icons.Filled.Settings, cs.surfaceVariant, cs.onSurfaceVariant, Modifier.weight(1f), onSettings)
+                        MenuPlocica("Sig. kopija", Icons.Filled.CloudUpload, cs.surfaceVariant, cs.onSurfaceVariant, Modifier.weight(1f), onBackup)
+                    }
+                }
             }
-            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                MenuPlocica("Partneri", Icons.Filled.Groups, cs.tertiaryContainer, cs.onTertiaryContainer, Modifier.weight(1f), onPartners)
-                MenuPlocica("Postavke", Icons.Filled.Settings, cs.surfaceVariant, cs.onSurfaceVariant, Modifier.weight(1f), onSettings)
+        }
+    }
+}
+
+@Composable
+private fun StatKartica(naslov: String, vrijednost: String, ikona: ImageVector, pozadina: Color, naPozadini: Color, modifier: Modifier) {
+    Card(modifier, colors = CardDefaults.cardColors(containerColor = pozadina, contentColor = naPozadini)) {
+        Row(Modifier.padding(14.dp).fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            Box(
+                Modifier.size(36.dp).clip(CircleShape).background(naPozadini.copy(alpha = 0.15f)),
+                contentAlignment = Alignment.Center,
+            ) { Icon(ikona, null, tint = naPozadini, modifier = Modifier.size(20.dp)) }
+            Spacer(Modifier.width(10.dp))
+            Column {
+                Text(naslov, style = MaterialTheme.typography.labelMedium)
+                Text(vrijednost, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
             }
-            MenuPlocica("Sigurnosna kopija", Icons.Filled.CloudUpload, cs.surfaceVariant, cs.onSurfaceVariant, Modifier.fillMaxWidth(), onBackup)
         }
     }
 }

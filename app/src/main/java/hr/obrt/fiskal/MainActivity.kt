@@ -20,12 +20,13 @@ import hr.obrt.fiskal.ui.InvoiceDetailScreen
 import hr.obrt.fiskal.ui.InvoiceScreen
 import hr.obrt.fiskal.ui.InvoiceSetupScreen
 import hr.obrt.fiskal.ui.PartnersScreen
+import hr.obrt.fiskal.ui.ReportsScreen
 import hr.obrt.fiskal.ui.SettingsScreen
 import hr.obrt.fiskal.ui.theme.FiskalTheme
 import hr.obrt.fiskal.data.AppPreferences
 
 private enum class Screen {
-    CompanyList, Home, Settings, ActivityPicker, InvoiceSetup, Invoice, History, Detail, Articles, Partners, Backup
+    CompanyList, Home, Settings, ActivityPicker, InvoiceSetup, Invoice, History, Detail, Articles, Partners, Backup, Reports
 }
 
 class MainActivity : ComponentActivity() {
@@ -73,8 +74,11 @@ class MainActivity : ComponentActivity() {
                         onSettings = { vm.selected.value?.let { vm.editCompany(it) }; screen = Screen.Settings },
                         onCompanies = { screen = Screen.CompanyList },
                         onBackup = { screen = Screen.Backup },
+                        onReports = { screen = Screen.Reports },
                         onOpenInvoice = { vm.loadHistory(); vm.openDetail(it); screen = Screen.Detail },
                     )
+
+                    Screen.Reports -> ReportsScreen(vm, onBack = { screen = Screen.Home })
 
                     Screen.Backup -> BackupScreen(onBack = { vm.refreshCompanies(); screen = Screen.Home })
 

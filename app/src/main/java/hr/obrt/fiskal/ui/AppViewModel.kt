@@ -32,6 +32,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.math.BigDecimal
 import java.math.RoundingMode
+import java.util.Calendar
 import java.util.Date
 import java.util.UUID
 
@@ -62,6 +63,35 @@ data class StavkaUnos(
     val pdvStopa: String,
     var kolicina: String = "1",
     var jedCijena: String = "",
+)
+
+/** Period za koji se generira izvještaj. */
+enum class PeriodIzvjestaja(val naziv: String) {
+    DANAS("Danas"), TJEDAN("7 dana"), MJESEC("Ovaj mjesec"), SVE("Sve vrijeme");
+
+    /** Početak perioda (epoch millis), ili null za "Sve vrijeme". */
+    fun pocetak(): Long? = when (this) {
+        DANAS -> Calendar.getInstance().apply {
+            set(Calendar.HOUR_OF_DAY, 0); set(Calendar.MINUTE, 0); set(Calendar.SECOND, 0); set(Calendar.MILLISECOND, 0)
+        }.timeInMillis
+        TJEDAN -> Calendar.getInstance().apply { add(Calendar.DAY_OF_YEAR, -7) }.timeInMillis
+        MJESEC -> Calendar.getInstance().apply {
+            set(Calendar.DAY_OF_MONTH, 1); set(Calendar.HOUR_OF_DAY, 0); set(Calendar.MINUTE, 0); set(Calendar.SECOND, 0); set(Calendar.MILLISECOND, 0)
+        }.timeInMillis
+        SVE -> null
+    }
+}
+
+data class StavkaNacinPlac(val nacin: NacinPlac, val brojRacuna: Int, val ukupno: BigDecimal)
+data class StavkaPdv(val stopa: String, val osnovica: BigDecimal, val pdv: BigDecimal, val ukupno: BigDecimal)
+data class StavkaArtikl(val naziv: String, val kolicina: BigDecimal, val ukupno: BigDecimal)
+
+data class Izvjestaj(
+    val brojRacuna: Int,
+    val ukupanPromet: BigDecimal,
+    val poNacinuPlac: List<StavkaNacinPlac>,
+    val pdvRekapitulacija: List<StavkaPdv>,
+    val poArtiklima: List<StavkaArtikl>,
 )
 
 class AppViewModel(app: Application) : AndroidViewModel(app) {
@@ -532,6 +562,58 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     fun openDetail(si: SavedInvoice) { detail.value = si }
     fun closeDetail() { detail.value = null }
+
+    // --- Izvještaji ---
+
+    /** Izračuna izvještaj za odabranu tvrtku i period (samo fiskalizirani računi). */
+    fun izvjestaj(period: PeriodIzvjestaja): Izvjestaj {
+        val t = selected.value ?: return Izvjestaj(0, BigDecimal.ZERO, emptyList(), emptyList(), emptyList())
+        val svi = invoiceStore.zaTvrtku(t.id).filter { it.jir != null }
+        val od = period.pocetak()
+        val filtrirano = if (od == null) svi else svi.filter { it.createdAt >= od }
+
+        val brojRacuna = filtrirano.size
+        val ukupanPromet = filtrirano.zbrojRacuna { it.racun.iznosUkupno }
+
+        val poNacinu = filtrirano.groupBy { it.racun.nacinPlac }
+            .map { (nacin, lista) -> StavkaNacinPlac(nacin, lista.size, lista.zbrojRacuna { it.racun.iznosUkupno }) }
+            .sortedByDescending { it.ukupno.abs() }
+
+        val pdvOsnovica = mutableMapOf<String, BigDecimal>()
+        val pdvIznos = mutableMapOf<String, BigDecimal>()
+        filtrirano.forEach { si ->
+            si.racun.pdvGrupe().forEach { g ->
+                val key = fmt(g.stopa)
+                pdvOsnovica[key] = (pdvOsnovica[key] ?: BigDecimal.ZERO).add(g.osnovica)
+                pdvIznos[key] = (pdvIznos[key] ?: BigDecimal.ZERO).add(g.iznos)
+            }
+        }
+        val pdvRekapitulacija = pdvOsnovica.keys.sortedBy { it.toBigDecimalOrNull() ?: BigDecimal.ZERO }
+            .map { stopa ->
+                val osn = pdvOsnovica[stopa] ?: BigDecimal.ZERO
+                val pdv = pdvIznos[stopa] ?: BigDecimal.ZERO
+                StavkaPdv(stopa, fmt2(osn), fmt2(pdv), fmt2(osn.add(pdv)))
+            }
+
+        val artKolicina = mutableMapOf<String, BigDecimal>()
+        val artUkupno = mutableMapOf<String, BigDecimal>()
+        filtrirano.forEach { si ->
+            si.racun.stavke.forEach { s ->
+                artKolicina[s.naziv] = (artKolicina[s.naziv] ?: BigDecimal.ZERO).add(s.kolicina)
+                artUkupno[s.naziv] = (artUkupno[s.naziv] ?: BigDecimal.ZERO).add(s.ukupno)
+            }
+        }
+        val poArtiklima = artUkupno.keys
+            .map { naziv -> StavkaArtikl(naziv, artKolicina[naziv] ?: BigDecimal.ZERO, fmt2(artUkupno[naziv] ?: BigDecimal.ZERO)) }
+            .sortedByDescending { it.ukupno.abs() }
+
+        return Izvjestaj(brojRacuna, ukupanPromet, poNacinu, pdvRekapitulacija, poArtiklima)
+    }
+
+    private fun String.toBigDecimalOrNull(): BigDecimal? = runCatching { BigDecimal(this) }.getOrNull()
+    private fun fmt2(b: BigDecimal): BigDecimal = b.setScale(2, RoundingMode.HALF_UP)
+    private inline fun List<SavedInvoice>.zbrojRacuna(selector: (SavedInvoice) -> BigDecimal): BigDecimal =
+        fold(BigDecimal.ZERO) { acc, si -> acc.add(selector(si)) }.setScale(2, RoundingMode.HALF_UP)
 
     fun obrisiIzPovijesti(si: SavedInvoice) {
         invoiceStore.obrisi(si)

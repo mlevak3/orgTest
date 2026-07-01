@@ -7,6 +7,12 @@ import android.content.pm.PackageManager
 import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
@@ -16,6 +22,8 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.ExpandLess
+import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.StarBorder
 import androidx.compose.material3.*
@@ -23,6 +31,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
@@ -144,10 +153,11 @@ fun SettingsScreen(vm: AppViewModel, onClose: () -> Unit) {
             p.copy(naplatniUredjaji = p.naplatniUredjaji.map { if (it.id == uId) transform(it) else it }.toMutableList())
         }
     }
-    fun dodajDjelatnost() {
+    fun dodajDjelatnost(): String {
         val nova = Djelatnost(naziv = "Nova djelatnost")
         djelatnosti = (djelatnosti + nova).toMutableList()
         if (zadanaDjelatnostId.isBlank()) zadanaDjelatnostId = nova.id
+        return nova.id
     }
     fun obrisiDjelatnost(id: String) {
         if (djelatnosti.size <= 1) return
@@ -402,26 +412,38 @@ private fun TabDjelatnosti(
     updateDjelatnost: (String, (Djelatnost) -> Djelatnost) -> Unit,
     updateProstor: (String, String, (PoslovniProstor) -> PoslovniProstor) -> Unit,
     updateUredjaj: (String, String, String, (NaplatniUredaj) -> NaplatniUredaj) -> Unit,
-    dodajDjelatnost: () -> Unit,
+    dodajDjelatnost: () -> String,
     obrisiDjelatnost: (String) -> Unit,
     dodajProstor: (String) -> Unit,
     obrisiProstor: (String, String) -> Unit,
     dodajUredjaj: (String, String) -> Unit,
     obrisiUredjaj: (String, String, String) -> Unit,
 ) {
+    var prosirenId by remember { mutableStateOf<String?>(djelatnosti.singleOrNull()?.id) }
+
     Text("Djelatnosti", style = MaterialTheme.typography.titleMedium)
     Text(
-        "Svaka djelatnost ima svoje poslovne prostore i naplatne uređaje. Zvjezdicom označi zadani prostor/uređaj/djelatnost.",
+        "Dodirni djelatnost za uređivanje poslovnog prostora i naplatnog uređaja. Zvjezdicom označi zadani prostor/uređaj/djelatnost.",
         style = MaterialTheme.typography.bodySmall,
     )
     djelatnosti.forEach { d ->
+        val prosiren = prosirenId == d.id
         ElevatedCard {
             Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    OutlinedTextField(
-                        value = d.naziv,
-                        onValueChange = { v -> updateDjelatnost(d.id) { it.copy(naziv = v) } },
-                        label = { Text("Naziv djelatnosti") }, singleLine = true, modifier = Modifier.weight(1f),
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.fillMaxWidth().clickable { prosirenId = if (prosiren) null else d.id },
+                ) {
+                    Icon(
+                        if (prosiren) Icons.Filled.ExpandLess else Icons.Filled.ExpandMore,
+                        "Prikaži/sakrij", tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    Spacer(Modifier.width(4.dp))
+                    Text(
+                        d.naziv.ifBlank { "Djelatnost" },
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.SemiBold,
+                        modifier = Modifier.weight(1f),
                     )
                     IconButton(onClick = { setZadanaDjelatnost(d.id) }) {
                         Icon(
@@ -430,67 +452,87 @@ private fun TabDjelatnosti(
                             tint = MaterialTheme.colorScheme.primary,
                         )
                     }
-                    if (djelatnosti.size > 1) IconButton(onClick = { obrisiDjelatnost(d.id) }) {
+                    if (djelatnosti.size > 1) IconButton(onClick = {
+                        obrisiDjelatnost(d.id)
+                        if (prosirenId == d.id) prosirenId = null
+                    }) {
                         Icon(Icons.Filled.Delete, "Obriši djelatnost", tint = MaterialTheme.colorScheme.error)
                     }
                 }
-                EnumRedak("Oznaka slijednosti", OznSlijed.entries.map { it to it.opis }, d.oznSlijed) { v ->
-                    updateDjelatnost(d.id) { it.copy(oznSlijed = v) }
-                }
 
-                Divider()
-                Text("Poslovni prostori", style = MaterialTheme.typography.labelLarge)
-                d.poslovniProstori.forEach { p ->
-                    Column(Modifier.padding(start = 8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            OutlinedTextField(
-                                value = p.oznaka,
-                                onValueChange = { v -> updateProstor(d.id, p.id) { it.copy(oznaka = v) } },
-                                label = { Text("Oznaka prostora") }, singleLine = true, modifier = Modifier.weight(1f),
-                            )
-                            IconButton(onClick = { updateDjelatnost(d.id) { it.copy(zadaniPoslovniProstorId = p.id) } }) {
-                                Icon(
-                                    if (d.zadaniPoslovniProstorId == p.id) Icons.Filled.Star else Icons.Filled.StarBorder,
-                                    "Zadani prostor", tint = MaterialTheme.colorScheme.secondary,
-                                )
-                            }
-                            if (d.poslovniProstori.size > 1) IconButton(onClick = { obrisiProstor(d.id, p.id) }) {
-                                Icon(Icons.Filled.Delete, "Obriši prostor", tint = MaterialTheme.colorScheme.error)
-                            }
+                AnimatedVisibility(
+                    visible = prosiren,
+                    enter = expandVertically() + fadeIn(),
+                    exit = shrinkVertically() + fadeOut(),
+                ) {
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        OutlinedTextField(
+                            value = d.naziv,
+                            onValueChange = { v -> updateDjelatnost(d.id) { it.copy(naziv = v) } },
+                            label = { Text("Naziv djelatnosti") }, singleLine = true, modifier = Modifier.fillMaxWidth(),
+                        )
+                        EnumRedak("Oznaka slijednosti", OznSlijed.entries.map { it to it.opis }, d.oznSlijed) { v ->
+                            updateDjelatnost(d.id) { it.copy(oznSlijed = v) }
                         }
-                        Column(Modifier.padding(start = 16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                            Text("Naplatni uređaji", style = MaterialTheme.typography.labelMedium)
-                            p.naplatniUredjaji.forEach { u ->
+
+                        Divider()
+                        Text("Poslovni prostori", style = MaterialTheme.typography.labelLarge)
+                        d.poslovniProstori.forEach { p ->
+                            Column(Modifier.padding(start = 8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                                 Row(verticalAlignment = Alignment.CenterVertically) {
                                     OutlinedTextField(
-                                        value = u.oznaka,
-                                        onValueChange = { v -> updateUredjaj(d.id, p.id, u.id) { it.copy(oznaka = v) } },
-                                        label = { Text("Oznaka uređaja") }, singleLine = true, modifier = Modifier.weight(1f),
+                                        value = p.oznaka,
+                                        onValueChange = { v -> updateProstor(d.id, p.id) { it.copy(oznaka = v) } },
+                                        label = { Text("Oznaka prostora") }, singleLine = true, modifier = Modifier.weight(1f),
                                     )
-                                    IconButton(onClick = { updateDjelatnost(d.id) { it.copy(zadaniNaplatniUredjajId = u.id) } }) {
+                                    IconButton(onClick = { updateDjelatnost(d.id) { it.copy(zadaniPoslovniProstorId = p.id) } }) {
                                         Icon(
-                                            if (d.zadaniNaplatniUredjajId == u.id) Icons.Filled.Star else Icons.Filled.StarBorder,
-                                            "Zadani uređaj", tint = MaterialTheme.colorScheme.tertiary,
+                                            if (d.zadaniPoslovniProstorId == p.id) Icons.Filled.Star else Icons.Filled.StarBorder,
+                                            "Zadani prostor", tint = MaterialTheme.colorScheme.secondary,
                                         )
                                     }
-                                    if (p.naplatniUredjaji.size > 1) IconButton(onClick = { obrisiUredjaj(d.id, p.id, u.id) }) {
-                                        Icon(Icons.Filled.Delete, "Obriši uređaj", tint = MaterialTheme.colorScheme.error)
+                                    if (d.poslovniProstori.size > 1) IconButton(onClick = { obrisiProstor(d.id, p.id) }) {
+                                        Icon(Icons.Filled.Delete, "Obriši prostor", tint = MaterialTheme.colorScheme.error)
+                                    }
+                                }
+                                Column(Modifier.padding(start = 16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                    Text("Naplatni uređaji", style = MaterialTheme.typography.labelMedium)
+                                    p.naplatniUredjaji.forEach { u ->
+                                        Row(verticalAlignment = Alignment.CenterVertically) {
+                                            OutlinedTextField(
+                                                value = u.oznaka,
+                                                onValueChange = { v -> updateUredjaj(d.id, p.id, u.id) { it.copy(oznaka = v) } },
+                                                label = { Text("Oznaka uređaja") }, singleLine = true, modifier = Modifier.weight(1f),
+                                            )
+                                            IconButton(onClick = { updateDjelatnost(d.id) { it.copy(zadaniNaplatniUredjajId = u.id) } }) {
+                                                Icon(
+                                                    if (d.zadaniNaplatniUredjajId == u.id) Icons.Filled.Star else Icons.Filled.StarBorder,
+                                                    "Zadani uređaj", tint = MaterialTheme.colorScheme.tertiary,
+                                                )
+                                            }
+                                            if (p.naplatniUredjaji.size > 1) IconButton(onClick = { obrisiUredjaj(d.id, p.id, u.id) }) {
+                                                Icon(Icons.Filled.Delete, "Obriši uređaj", tint = MaterialTheme.colorScheme.error)
+                                            }
+                                        }
+                                    }
+                                    TextButton(onClick = { dodajUredjaj(d.id, p.id) }) {
+                                        Icon(Icons.Filled.Add, null, Modifier.size(18.dp)); Spacer(Modifier.width(4.dp)); Text("Dodaj uređaj")
                                     }
                                 }
                             }
-                            TextButton(onClick = { dodajUredjaj(d.id, p.id) }) {
-                                Icon(Icons.Filled.Add, null, Modifier.size(18.dp)); Spacer(Modifier.width(4.dp)); Text("Dodaj uređaj")
-                            }
+                        }
+                        TextButton(onClick = { dodajProstor(d.id) }) {
+                            Icon(Icons.Filled.Add, null, Modifier.size(18.dp)); Spacer(Modifier.width(4.dp)); Text("Dodaj poslovni prostor")
                         }
                     }
-                }
-                TextButton(onClick = { dodajProstor(d.id) }) {
-                    Icon(Icons.Filled.Add, null, Modifier.size(18.dp)); Spacer(Modifier.width(4.dp)); Text("Dodaj poslovni prostor")
                 }
             }
         }
     }
-    OutlinedButton(onClick = dodajDjelatnost, modifier = Modifier.fillMaxWidth()) {
+    OutlinedButton(
+        onClick = { prosirenId = dodajDjelatnost() },
+        modifier = Modifier.fillMaxWidth(),
+    ) {
         Icon(Icons.Filled.Add, null, Modifier.size(18.dp)); Spacer(Modifier.width(4.dp)); Text("Dodaj djelatnost")
     }
 }
