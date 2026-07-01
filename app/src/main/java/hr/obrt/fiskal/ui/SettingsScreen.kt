@@ -59,6 +59,7 @@ fun SettingsScreen(vm: AppViewModel, onClose: () -> Unit) {
     var zadanaPdvStopa by remember { mutableStateOf(company.zadanaPdvStopa) }
     var zadaniNacinPlac by remember { mutableStateOf(company.zadaniNacinPlac) }
     var zadanaJedMjere by remember { mutableStateOf(company.zadanaJedMjere) }
+    var logoPostoji by remember { mutableStateOf(store.logoPostoji(company.id)) }
 
     // --- Tab 2: Djelatnosti (duboka kopija radi neovisnog uređivanja prije spremanja) ---
     var djelatnosti by remember { mutableStateOf(dubokaKopija(company.djelatnosti)) }
@@ -97,6 +98,15 @@ fun SettingsScreen(vm: AppViewModel, onClose: () -> Unit) {
         }
     }
 
+    val logoPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        if (uri != null) runCatching {
+            val bytes = ctx.contentResolver.openInputStream(uri)!!.use { it.readBytes() }
+            require(android.graphics.BitmapFactory.decodeByteArray(bytes, 0, bytes.size) != null) { "Datoteka nije valjana slika." }
+            store.spremiLogo(company.id, bytes)
+            logoPostoji = true
+            poruka = "Logo učitan."
+        }.onFailure { poruka = "Greška pri učitavanju loga: ${it.message}" }
+    }
     val certPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri != null) runCatching {
             val bytes = ctx.contentResolver.openInputStream(uri)!!.use { it.readBytes() }
@@ -222,6 +232,9 @@ fun SettingsScreen(vm: AppViewModel, onClose: () -> Unit) {
                     naziv, { naziv = it }, oib, { oib = it }, oper, { oper = it }, pdv, { pdv = it },
                     zadanaPdvStopa, { zadanaPdvStopa = it }, zadaniNacinPlac, { zadaniNacinPlac = it },
                     zadanaJedMjere, { zadanaJedMjere = it },
+                    logoPostoji,
+                    onUcitajLogo = { logoPicker.launch(arrayOf("image/*")) },
+                    onUkloniLogo = { store.obrisiLogo(company.id); logoPostoji = false },
                 )
                 1 -> TabDjelatnosti(
                     djelatnosti, zadanaDjelatnostId, { zadanaDjelatnostId = it },
@@ -314,6 +327,8 @@ private fun TabPodaci(
     zadanaPdvStopa: String, setZadanaPdvStopa: (String) -> Unit,
     zadaniNacinPlac: NacinPlac, setZadaniNacinPlac: (NacinPlac) -> Unit,
     zadanaJedMjere: String, setZadanaJedMjere: (String) -> Unit,
+    logoPostoji: Boolean,
+    onUcitajLogo: () -> Unit, onUkloniLogo: () -> Unit,
 ) {
     Text("Podaci o tvrtki", style = MaterialTheme.typography.titleMedium)
     OutlinedTextField(
@@ -335,6 +350,18 @@ private fun TabPodaci(
     Row(verticalAlignment = Alignment.CenterVertically) {
         Switch(checked = pdv, onCheckedChange = setPdv)
         Spacer(Modifier.width(8.dp)); Text("Obveznik u sustavu PDV-a")
+    }
+
+    Divider()
+    Text("Logo tvrtke", style = MaterialTheme.typography.titleMedium)
+    Text(
+        if (logoPostoji) "Logo je učitan — prikazuje se na ispisu, PDF-u i emailu."
+        else "Nema loga (naslov računa ostaje samo tekstualni).",
+        style = MaterialTheme.typography.bodySmall,
+    )
+    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        Button(onClick = onUcitajLogo) { Text("Učitaj logo") }
+        if (logoPostoji) OutlinedButton(onClick = onUkloniLogo) { Text("Ukloni") }
     }
 
     Divider()

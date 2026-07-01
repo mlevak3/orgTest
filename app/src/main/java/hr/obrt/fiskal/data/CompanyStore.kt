@@ -108,6 +108,13 @@ class CompanyStore(context: Context) {
     fun caBytes(id: String): ByteArray? = if (caPostoji(id)) caFile(id).readBytes() else null
     fun obrisiCa(id: String) { caFile(id).delete() }
 
+    // --- Logo tvrtke (za ispis/PDF/email) ---
+    fun logoFile(id: String): File = File(appContext.filesDir, "logo_$id.png")
+    fun spremiLogo(id: String, bytes: ByteArray) = logoFile(id).writeBytes(bytes)
+    fun logoPostoji(id: String): Boolean = logoFile(id).let { it.exists() && it.length() > 0 }
+    fun logoBytes(id: String): ByteArray? = if (logoPostoji(id)) logoFile(id).readBytes() else null
+    fun obrisiLogo(id: String) { logoFile(id).delete() }
+
     private fun passKey(id: String) = "pass_$id"
 
     private fun migrirajStaruKonfiguraciju() {

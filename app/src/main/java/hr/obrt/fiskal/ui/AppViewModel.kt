@@ -436,6 +436,25 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         history.addAll(invoiceStore.zaTvrtku(t.id))
     }
 
+    /** Broj fiskaliziranih računa i promet za danas (odabrana tvrtka). Za prikaz na početnoj. */
+    fun statistikaDanas(): Pair<Int, BigDecimal> {
+        val t = selected.value ?: return 0 to BigDecimal.ZERO
+        val danas = java.util.Calendar.getInstance().apply {
+            set(java.util.Calendar.HOUR_OF_DAY, 0); set(java.util.Calendar.MINUTE, 0)
+            set(java.util.Calendar.SECOND, 0); set(java.util.Calendar.MILLISECOND, 0)
+        }.timeInMillis
+        val danasnji = invoiceStore.zaTvrtku(t.id).filter { it.jir != null && it.createdAt >= danas }
+        val promet = danasnji.fold(BigDecimal.ZERO) { acc, si -> acc.add(si.racun.iznosUkupno) }
+            .setScale(2, RoundingMode.HALF_UP)
+        return danasnji.size to promet
+    }
+
+    /** Zadnji spremljeni račun odabrane tvrtke (najnoviji prvi), za brzu karticu na početnoj. */
+    fun zadnjiRacun(): SavedInvoice? {
+        val t = selected.value ?: return null
+        return invoiceStore.zaTvrtku(t.id).firstOrNull()
+    }
+
     fun openDetail(si: SavedInvoice) { detail.value = si }
     fun closeDetail() { detail.value = null }
 
@@ -447,10 +466,12 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     // --- Ispis / email ---
     fun receiptFromIshod(): ReceiptData? {
         val i = ishod.value ?: return null
+        val t = selected.value
         return ReceiptData(
-            naslovTvrtke = selected.value?.opis() ?: "",
+            naslovTvrtke = t?.opis() ?: "",
             racun = i.racun, jir = i.jir, zki = i.zki, qrUrl = i.qrUrl,
             kupac = kupacNaziv.value, kupacOib = kupacOib.value, napomena = napomena.value,
+            logoPng = t?.let { companyStore.logoBytes(it.id) },
         )
     }
 
@@ -463,6 +484,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         kupac = si.kupac,
         kupacOib = si.kupacOib,
         napomena = si.napomena,
+        logoPng = companyStore.logoBytes(si.companyId),
     )
 
     /** MAC adresa Bluetooth pisača trenutno odabrane tvrtke (ako je postavljena). */

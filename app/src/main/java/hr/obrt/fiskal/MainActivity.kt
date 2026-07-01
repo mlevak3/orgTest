@@ -21,6 +21,7 @@ import hr.obrt.fiskal.ui.InvoiceScreen
 import hr.obrt.fiskal.ui.InvoiceSetupScreen
 import hr.obrt.fiskal.ui.SettingsScreen
 import hr.obrt.fiskal.ui.theme.FiskalTheme
+import hr.obrt.fiskal.data.AppPreferences
 
 private enum class Screen {
     CompanyList, Home, Settings, ActivityPicker, InvoiceSetup, Invoice, History, Detail, Articles, Backup
@@ -30,7 +31,9 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContent {
-            FiskalTheme {
+            val appPrefs = remember { AppPreferences(this) }
+            var tema by remember { mutableStateOf(appPrefs.tema) }
+            FiskalTheme(tema = tema) {
                 val vm: AppViewModel = viewModel()
                 var screen by remember {
                     mutableStateOf(if (vm.selected.value == null) Screen.CompanyList else Screen.Home)
@@ -57,6 +60,8 @@ class MainActivity : ComponentActivity() {
 
                     Screen.Home -> HomeScreen(
                         vm,
+                        tema = tema,
+                        onToggleTema = { tema = tema.sljedeca(); appPrefs.tema = tema },
                         onNewInvoice = {
                             vm.pripremiNoviRacun()
                             screen = if (vm.trebaOdabirDjelatnosti()) Screen.ActivityPicker else Screen.InvoiceSetup
@@ -66,6 +71,7 @@ class MainActivity : ComponentActivity() {
                         onSettings = { vm.selected.value?.let { vm.editCompany(it) }; screen = Screen.Settings },
                         onCompanies = { screen = Screen.CompanyList },
                         onBackup = { screen = Screen.Backup },
+                        onOpenInvoice = { vm.loadHistory(); vm.openDetail(it); screen = Screen.Detail },
                     )
 
                     Screen.Backup -> BackupScreen(onBack = { vm.refreshCompanies(); screen = Screen.Home })

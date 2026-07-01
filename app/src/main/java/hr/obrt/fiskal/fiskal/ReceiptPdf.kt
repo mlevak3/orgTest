@@ -40,8 +40,18 @@ object ReceiptPdf {
         // Svaka stavka dobiva dodatni redak "kol. x cijena"; PDV obveznik još i redak neto/PDV.
         val podredciPoStavci = if (z.uSustavuPdv) 2 else 1
         val pdvPodredci = r.stavke.size * podredciPoStavci
+
+        val logoMaxW = 140f; val logoMaxH = 60f
+        val logoBitmap = data.logoPng?.let { png ->
+            runCatching { android.graphics.BitmapFactory.decodeByteArray(png, 0, png.size) }.getOrNull()
+        }
+        val logoDrawH = logoBitmap?.let { bmp ->
+            val skala = minOf(logoMaxW / bmp.width, logoMaxH / bmp.height, 1f)
+            bmp.height * skala
+        } ?: 0f
+
         val height = (margin * 2 + brojLinija * lineH + pdvPodredci * tinyH + 12 + qrSize + 8 +
-            (1 + urlLines.size) * tinyH + 16).toInt()
+            (1 + urlLines.size) * tinyH + 16 + logoDrawH + (if (logoBitmap != null) 8 else 0)).toInt()
 
         val doc = PdfDocument()
         val page = doc.startPage(PdfDocument.PageInfo.Builder(pageWidth, height, 1).create())
@@ -59,6 +69,14 @@ object ReceiptPdf {
         fun sep() {
             c.drawLine(margin, y - 6f, pageWidth - margin, y - 6f, normal)
             y += lineH
+        }
+
+        if (logoBitmap != null) {
+            val skala = minOf(logoMaxW / logoBitmap.width, logoMaxH / logoBitmap.height, 1f)
+            val w = (logoBitmap.width * skala).toInt().coerceAtLeast(1)
+            val h = (logoBitmap.height * skala).toInt().coerceAtLeast(1)
+            c.drawBitmap(Bitmap.createScaledBitmap(logoBitmap, w, h, true), (pageWidth - w) / 2f, y, null)
+            y += h + 8f
         }
 
         val tW = title.measureText("RAČUN")

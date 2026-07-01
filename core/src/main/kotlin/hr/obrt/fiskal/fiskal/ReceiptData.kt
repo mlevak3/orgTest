@@ -12,6 +12,8 @@ data class ReceiptData(
     val kupac: String = "",
     val kupacOib: String = "",
     val napomena: String = "",
+    /** Logo tvrtke (PNG bajtovi), za ispis/PDF/email — opcionalno. */
+    val logoPng: ByteArray? = null,
 ) {
     fun brojRacuna(): String =
         "${racun.brOznRac}/${racun.zaglavlje.oznPosPr}/${racun.zaglavlje.oznNapUr}"

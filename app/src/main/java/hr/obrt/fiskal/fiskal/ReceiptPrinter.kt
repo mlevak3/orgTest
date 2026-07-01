@@ -47,6 +47,11 @@ object ReceiptPrinter {
         val z = r.zaglavlje
         val datum = SimpleDateFormat("dd.MM.yyyy HH:mm:ss", Locale.ROOT).format(r.datVrijeme)
         val brojRacuna = "${r.brOznRac}/${z.oznPosPr}/${z.oznNapUr}"
+        val logoHtml = data.logoPng?.let {
+            "<div style=\"text-align:center\"><img src=\"data:image/png;base64," +
+                android.util.Base64.encodeToString(it, android.util.Base64.NO_WRAP) +
+                "\" style=\"max-width:160px;max-height:80px;margin-bottom:4px\"></div>"
+        } ?: ""
 
         val stavkeHeader = if (z.uSustavuPdv) {
             "<tr><th>Naziv</th><th class=\"r\">Kol.</th><th class=\"r\">Cijena</th>" +
@@ -111,6 +116,7 @@ object ReceiptPrinter {
               .warn { color: #b00; }
               .foot { text-align: center; font-size: 10px; margin-top: 8px; }
             </style></head><body>
+              $logoHtml
               <h1>RAČUN</h1>
               <div style="text-align:center;font-weight:bold">${esc(data.naslovTvrtke)}</div>
               <div><b>OIB:</b> ${esc(z.oib)}</div>

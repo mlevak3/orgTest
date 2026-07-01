@@ -70,9 +70,14 @@ private val AppShapes = Shapes(
 )
 
 @Composable
-fun FiskalTheme(content: @Composable () -> Unit) {
+fun FiskalTheme(tema: hr.obrt.fiskal.data.TemaAplikacije = hr.obrt.fiskal.data.TemaAplikacije.SUSTAV, content: @Composable () -> Unit) {
+    val tamna = when (tema) {
+        hr.obrt.fiskal.data.TemaAplikacije.SUSTAV -> isSystemInDarkTheme()
+        hr.obrt.fiskal.data.TemaAplikacije.SVIJETLA -> false
+        hr.obrt.fiskal.data.TemaAplikacije.TAMNA -> true
+    }
     MaterialTheme(
-        colorScheme = if (isSystemInDarkTheme()) DarkColors else LightColors,
+        colorScheme = if (tamna) DarkColors else LightColors,
         shapes = AppShapes,
         content = content,
     )

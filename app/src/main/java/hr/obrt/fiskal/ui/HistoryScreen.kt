@@ -4,16 +4,21 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Print
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import hr.obrt.fiskal.data.SavedInvoice
 import hr.obrt.fiskal.fiskal.FiskalFormat
+import hr.obrt.fiskal.fiskal.InvoiceShare
+import hr.obrt.fiskal.fiskal.ReceiptPrinter
 import java.math.BigDecimal
 import java.text.SimpleDateFormat
 import java.util.Calendar
@@ -72,6 +77,7 @@ fun HistoryScreen(vm: AppViewModel, onOpen: (SavedInvoice) -> Unit, onBack: () -
                     Text(if (vm.history.isEmpty()) "Još nema spremljenih računa." else "Nema rezultata za pretragu.")
                 }
             } else {
+                val ctx = LocalContext.current
                 LazyColumn(
                     Modifier.padding(horizontal = 12.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp),
@@ -85,7 +91,16 @@ fun HistoryScreen(vm: AppViewModel, onOpen: (SavedInvoice) -> Unit, onBack: () -
                                     Text("${FiskalFormat.amount(si.racun.iznosUkupno)} €", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                                 }
                                 Text(fmt.format(Date(si.createdAt)), style = MaterialTheme.typography.bodySmall)
-                                StatusCip(si)
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    StatusCip(si)
+                                    Spacer(Modifier.weight(1f))
+                                    IconButton(onClick = { ReceiptPrinter.print(ctx, vm.receiptFromSaved(si)) }) {
+                                        Icon(Icons.Filled.Print, "Ispiši", modifier = Modifier.size(20.dp))
+                                    }
+                                    IconButton(onClick = { InvoiceShare.sharePdf(ctx, vm.receiptFromSaved(si)) }) {
+                                        Icon(Icons.Filled.Share, "Podijeli", modifier = Modifier.size(20.dp))
+                                    }
+                                }
                             }
                         }
                     }
