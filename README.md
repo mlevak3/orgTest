@@ -11,6 +11,12 @@ račun), **C** (ček), **O** (ostalo).
 > **Napomena (2026.):** od 1.1.2026. fiskaliziraju se **svi** računi izdani
 > potrošačima (B2C), bez obzira na način plaćanja — ne samo gotovinski.
 
+**Dodatne značajke:** više tvrtki, šifrarnik artikala, povijest i pretraga
+računa s prometom, ispis/PDF/email/podijeli, ispis na Bluetooth POS pisač
+(ESC/POS — testirano za Bixolon SPP-R200II), sigurnosna kopija (izvoz/uvoz
+svih podataka), zadane vrijednosti po tvrtki, test veze (Echo) i potvrde prije
+fiskalizacije/izlaza iz računa.
+
 ---
 
 ## Što aplikacija radi

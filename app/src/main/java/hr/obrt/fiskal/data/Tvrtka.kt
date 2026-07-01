@@ -1,6 +1,7 @@
 package hr.obrt.fiskal.data
 
 import hr.obrt.fiskal.fiskal.FiskalOkolina
+import hr.obrt.fiskal.model.NacinPlac
 import hr.obrt.fiskal.model.OznSlijed
 import hr.obrt.fiskal.model.Zaglavlje
 import org.json.JSONObject
@@ -19,6 +20,12 @@ data class Tvrtka(
     var okolina: FiskalOkolina = FiskalOkolina.TEST,
     var ignoreTls: Boolean = false,
     var sljedeciBroj: Long = 1L,
+    /** MAC adresa uparenog Bluetooth POS pisača (npr. Bixolon SPP-R200II), ili prazno. */
+    var printerAddress: String = "",
+    // --- Zadane vrijednosti (ubrzavaju unos novog računa/artikla) ---
+    var zadanaPdvStopa: String = "25",
+    var zadaniNacinPlac: NacinPlac = NacinPlac.G,
+    var zadanaJedMjere: String = "kom",
 ) {
     fun zaglavlje(): Zaglavlje =
         Zaglavlje(oib, uSustavuPdv, oznPosPr, oznNapUr, oznSlijed, oibOper.ifBlank { oib })
@@ -37,6 +44,10 @@ data class Tvrtka(
         put("okolina", okolina.name)
         put("ignoreTls", ignoreTls)
         put("sljedeciBroj", sljedeciBroj)
+        put("printerAddress", printerAddress)
+        put("zadanaPdvStopa", zadanaPdvStopa)
+        put("zadaniNacinPlac", zadaniNacinPlac.oznaka)
+        put("zadanaJedMjere", zadanaJedMjere)
     }
 
     companion object {
@@ -52,6 +63,10 @@ data class Tvrtka(
             okolina = runCatching { FiskalOkolina.valueOf(o.optString("okolina", "TEST")) }.getOrDefault(FiskalOkolina.TEST),
             ignoreTls = o.optBoolean("ignoreTls"),
             sljedeciBroj = o.optLong("sljedeciBroj", 1L),
+            printerAddress = o.optString("printerAddress"),
+            zadanaPdvStopa = o.optString("zadanaPdvStopa", "25"),
+            zadaniNacinPlac = NacinPlac.fromOznaka(o.optString("zadaniNacinPlac", "G")),
+            zadanaJedMjere = o.optString("zadanaJedMjere", "kom"),
         )
     }
 }

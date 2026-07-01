@@ -11,6 +11,7 @@ import androidx.compose.runtime.setValue
 import androidx.lifecycle.viewmodel.compose.viewModel
 import hr.obrt.fiskal.ui.AppViewModel
 import hr.obrt.fiskal.ui.ArticlesScreen
+import hr.obrt.fiskal.ui.BackupScreen
 import hr.obrt.fiskal.ui.CompanyListScreen
 import hr.obrt.fiskal.ui.HistoryScreen
 import hr.obrt.fiskal.ui.HomeScreen
@@ -19,7 +20,7 @@ import hr.obrt.fiskal.ui.InvoiceScreen
 import hr.obrt.fiskal.ui.SettingsScreen
 import hr.obrt.fiskal.ui.theme.FiskalTheme
 
-private enum class Screen { CompanyList, Home, Settings, Invoice, History, Detail, Articles }
+private enum class Screen { CompanyList, Home, Settings, Invoice, History, Detail, Articles, Backup }
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -56,7 +57,10 @@ class MainActivity : ComponentActivity() {
                         onArticles = { vm.biranjeArtikla.value = false; vm.loadArticles(); screen = Screen.Articles },
                         onSettings = { vm.selected.value?.let { vm.editCompany(it) }; screen = Screen.Settings },
                         onCompanies = { screen = Screen.CompanyList },
+                        onBackup = { screen = Screen.Backup },
                     )
+
+                    Screen.Backup -> BackupScreen(onBack = { vm.refreshCompanies(); screen = Screen.Home })
 
                     Screen.Settings -> SettingsScreen(
                         vm,

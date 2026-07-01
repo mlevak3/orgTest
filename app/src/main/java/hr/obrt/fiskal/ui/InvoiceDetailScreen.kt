@@ -5,19 +5,31 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.text.selection.SelectionContainer
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.viewModelScope
+import hr.obrt.fiskal.fiskal.BluetoothPrinter
+import hr.obrt.fiskal.fiskal.EscPosReceiptBuilder
 import hr.obrt.fiskal.fiskal.FiskalFormat
 import hr.obrt.fiskal.fiskal.InvoiceShare
 import hr.obrt.fiskal.fiskal.QrRenderer
 import hr.obrt.fiskal.fiskal.ReceiptPrinter
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -73,17 +85,36 @@ fun InvoiceDetailScreen(vm: AppViewModel, onBack: () -> Unit, onCopy: () -> Unit
                 Text("Plaćanje: ${si.racun.nacinPlac.opis}", style = MaterialTheme.typography.bodySmall)
                 if (si.napomena.isNotBlank()) Text("Napomena: ${si.napomena}", style = MaterialTheme.typography.bodySmall)
             }
-            item {
-                Text("JIR", style = MaterialTheme.typography.labelLarge)
-                SelectionContainer { Text(si.jir ?: "— (${si.status})", fontFamily = FontFamily.Monospace) }
-                Text("ZKI", style = MaterialTheme.typography.labelLarge)
-                SelectionContainer { Text(si.zki, fontFamily = FontFamily.Monospace) }
-            }
+            item { PoljeKopija("JIR", si.jir ?: "— (${si.status})", ctx) }
+            item { PoljeKopija("ZKI", si.zki, ctx) }
             item { Image(bitmap = qr, contentDescription = "QR", modifier = Modifier.size(200.dp)) }
             item {
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     Button(onClick = { ReceiptPrinter.print(ctx, data) }, modifier = Modifier.weight(1f)) { Text("Ispiši / PDF") }
                     Button(onClick = { InvoiceShare.emailPdf(ctx, data) }, modifier = Modifier.weight(1f)) { Text("Email") }
+                }
+            }
+            item {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedButton(onClick = { InvoiceShare.sharePdf(ctx, data) }, modifier = Modifier.weight(1f)) { Text("Podijeli") }
+                    val printer = vm.printerAddressFor(si.companyId)
+                    var isprint by remember { mutableStateOf(false) }
+                    OutlinedButton(
+                        enabled = printer != null && !isprint,
+                        onClick = {
+                            val addr = printer
+                            if (addr != null) {
+                                isprint = true
+                                vm.viewModelScope.launch {
+                                    val res = withContext(Dispatchers.IO) {
+                                        BluetoothPrinter.posalji(ctx, addr, EscPosReceiptBuilder.build(data))
+                                    }
+                                    isprint = false
+                                }
+                            }
+                        },
+                        modifier = Modifier.weight(1f),
+                    ) { Text(if (isprint) "Šaljem…" else "POS pisač") }
                 }
             }
             item {
@@ -106,6 +137,19 @@ fun InvoiceDetailScreen(vm: AppViewModel, onBack: () -> Unit, onCopy: () -> Unit
                 ) { Text("Obriši iz povijesti") }
                 Spacer(Modifier.height(24.dp))
             }
+        }
+    }
+}
+
+@Composable
+private fun PoljeKopija(naziv: String, vrijednost: String, ctx: android.content.Context) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Column(Modifier.weight(1f)) {
+            Text(naziv, style = MaterialTheme.typography.labelLarge)
+            SelectionContainer { Text(vrijednost, fontFamily = FontFamily.Monospace) }
+        }
+        IconButton(onClick = { InvoiceShare.copyToClipboard(ctx, naziv, vrijednost) }) {
+            Icon(Icons.Filled.ContentCopy, "Kopiraj $naziv")
         }
     }
 }

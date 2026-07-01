@@ -9,6 +9,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material3.*
@@ -22,11 +23,17 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.viewModelScope
+import hr.obrt.fiskal.fiskal.BluetoothPrinter
+import hr.obrt.fiskal.fiskal.EscPosReceiptBuilder
 import hr.obrt.fiskal.fiskal.FiskalRezultat
 import hr.obrt.fiskal.fiskal.InvoiceShare
 import hr.obrt.fiskal.fiskal.QrRenderer
 import hr.obrt.fiskal.fiskal.ReceiptPrinter
 import hr.obrt.fiskal.model.NacinPlac
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -312,8 +319,8 @@ private fun ResultView(vm: AppViewModel, modifier: Modifier) {
                 if (prikaziRaw) SelectionContainer { Text(r.rawOdgovor, style = MaterialTheme.typography.bodySmall, fontFamily = FontFamily.Monospace) }
             }
         }
-        item { Polje2("JIR", ishod.jir ?: "— (nije dodijeljen)") }
-        item { Polje2("ZKI", ishod.zki) }
+        item { Polje2("JIR", ishod.jir ?: "— (nije dodijeljen)", ctx) }
+        item { Polje2("ZKI", ishod.zki, ctx) }
         item {
             Text("QR kôd (provjera računa)", style = MaterialTheme.typography.labelLarge)
             val bmp = remember(ishod.qrUrl) { QrRenderer.toBitmap(ishod.qrUrl, 600).asImageBitmap() }
@@ -324,6 +331,34 @@ private fun ResultView(vm: AppViewModel, modifier: Modifier) {
                 Button(onClick = { data?.let { ReceiptPrinter.print(ctx, it) } }, modifier = Modifier.weight(1f)) { Text("Ispiši / PDF") }
                 Button(onClick = { data?.let { InvoiceShare.emailPdf(ctx, it) } }, modifier = Modifier.weight(1f)) { Text("Email") }
             }
+        }
+        item {
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedButton(onClick = { data?.let { InvoiceShare.sharePdf(ctx, it) } }, modifier = Modifier.weight(1f)) { Text("Podijeli") }
+                val printer = vm.printerAddress()
+                var isprint by remember { mutableStateOf(false) }
+                OutlinedButton(
+                    enabled = printer != null && !isprint,
+                    onClick = {
+                        val d = data; val addr = printer
+                        if (d != null && addr != null) {
+                            isprint = true
+                            vm.viewModelScope.launch {
+                                val res = withContext(Dispatchers.IO) {
+                                    BluetoothPrinter.posalji(ctx, addr, EscPosReceiptBuilder.build(d))
+                                }
+                                isprint = false
+                                vm.greska.value = res.fold({ null }, { "Ispis na pisač nije uspio: ${it.message}" })
+                            }
+                        }
+                    },
+                    modifier = Modifier.weight(1f),
+                ) { Text(if (isprint) "Šaljem…" else "POS pisač") }
+            }
+            if (vm.printerAddress() == null) Text(
+                "Bluetooth pisač nije postavljen (Postavke tvrtke).",
+                style = MaterialTheme.typography.bodySmall,
+            )
         }
         item {
             OutlinedButton(onClick = { runCatching { uriHandler.openUri(ishod.qrUrl) } }, modifier = Modifier.fillMaxWidth()) { Text("Provjeri na Poreznoj") }
@@ -342,9 +377,14 @@ private fun StatusKartica(naslov: String, boja: androidx.compose.ui.graphics.Col
 }
 
 @Composable
-private fun Polje2(naziv: String, vrijednost: String) {
-    Column {
-        Text(naziv, style = MaterialTheme.typography.labelLarge)
-        SelectionContainer { Text(vrijednost, fontFamily = FontFamily.Monospace, style = MaterialTheme.typography.bodyLarge) }
+private fun Polje2(naziv: String, vrijednost: String, ctx: android.content.Context) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Column(Modifier.weight(1f)) {
+            Text(naziv, style = MaterialTheme.typography.labelLarge)
+            SelectionContainer { Text(vrijednost, fontFamily = FontFamily.Monospace, style = MaterialTheme.typography.bodyLarge) }
+        }
+        IconButton(onClick = { InvoiceShare.copyToClipboard(ctx, naziv, vrijednost) }) {
+            Icon(Icons.Filled.ContentCopy, "Kopiraj $naziv")
+        }
     }
 }

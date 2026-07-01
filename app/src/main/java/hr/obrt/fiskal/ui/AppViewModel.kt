@@ -110,7 +110,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     // --- Stavke ---
-    fun dodajStavku() = stavke.add(StavkaInput())
+    fun dodajStavku() = stavke.add(StavkaInput(pdvStopa = selected.value?.zadanaPdvStopa ?: "25"))
     fun ukloniStavku(index: Int) { if (stavke.size > 1) stavke.removeAt(index) }
 
     private fun uSustavuPdv(): Boolean = selected.value?.uSustavuPdv == true
@@ -253,9 +253,10 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun resetRacun() {
+        val t = selected.value
         stavke.clear()
-        stavke.add(StavkaInput())
-        nacinPlac.value = NacinPlac.G
+        stavke.add(StavkaInput(pdvStopa = t?.zadanaPdvStopa ?: "25"))
+        nacinPlac.value = t?.zadaniNacinPlac ?: NacinPlac.G
         storno.value = false
         kupacNaziv.value = ""
         kupacOib.value = ""
@@ -272,8 +273,10 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun newArticle() {
+        val t = selected.value
         editingArticle.value = Artikl(
-            pdvStopa = if (selected.value?.uSustavuPdv == true) BigDecimal("25") else BigDecimal.ZERO,
+            jedMjere = t?.zadanaJedMjere ?: "kom",
+            pdvStopa = if (t?.uSustavuPdv == true) (t.zadanaPdvStopa.toBigDecimalOrNull() ?: BigDecimal("25")) else BigDecimal.ZERO,
         )
     }
 
@@ -364,6 +367,13 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         kupacOib = si.kupacOib,
         napomena = si.napomena,
     )
+
+    /** MAC adresa Bluetooth pisača trenutno odabrane tvrtke (ako je postavljena). */
+    fun printerAddress(): String? =
+        selected.value?.printerAddress?.takeIf { it.isNotBlank() }
+
+    fun printerAddressFor(companyId: String): String? =
+        companies.firstOrNull { it.id == companyId }?.printerAddress?.takeIf { it.isNotBlank() }
 
     private fun parse(s: String): BigDecimal =
         s.trim().replace(',', '.').toBigDecimalOrNull() ?: BigDecimal.ZERO

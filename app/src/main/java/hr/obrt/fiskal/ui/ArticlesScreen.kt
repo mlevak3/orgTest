@@ -36,16 +36,27 @@ fun ArticlesScreen(vm: AppViewModel, onPick: ((Artikl) -> Unit)?, onBack: () -> 
             )
         },
     ) { pad ->
+        var q by remember { mutableStateOf("") }
+        val filtrirani = vm.articles.filter { q.isBlank() || it.naziv.contains(q, ignoreCase = true) }
+
         if (vm.articles.isEmpty()) {
             Box(Modifier.padding(pad).fillMaxSize(), contentAlignment = Alignment.Center) {
                 Text("Šifrarnik je prazan. Dodaj artikl (+).", style = MaterialTheme.typography.bodyLarge)
             }
         } else {
-            LazyColumn(
-                Modifier.padding(pad).padding(horizontal = 12.dp, vertical = 8.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                items(vm.articles) { a ->
+            Column(Modifier.padding(pad)) {
+                OutlinedTextField(
+                    value = q, onValueChange = { q = it },
+                    label = { Text("Pretraži artikle") }, singleLine = true,
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp),
+                )
+                if (filtrirani.isEmpty()) {
+                    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { Text("Nema rezultata.") }
+                } else LazyColumn(
+                    Modifier.padding(horizontal = 12.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                items(filtrirani) { a ->
                     val pick = onPick
                     ElevatedCard(onClick = { if (pick != null) pick(a) else vm.editArticle(a) }) {
                         Row(
@@ -68,6 +79,7 @@ fun ArticlesScreen(vm: AppViewModel, onPick: ((Artikl) -> Unit)?, onBack: () -> 
                     }
                 }
                 item { Spacer(Modifier.height(72.dp)) }
+                }
             }
         }
     }

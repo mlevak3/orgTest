@@ -6,6 +6,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Business
+import androidx.compose.material.icons.filled.CloudUpload
 import androidx.compose.material.icons.filled.List
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.ShoppingCart
@@ -27,6 +28,7 @@ fun HomeScreen(
     onArticles: () -> Unit,
     onSettings: () -> Unit,
     onCompanies: () -> Unit,
+    onBackup: () -> Unit,
 ) {
     val cs = MaterialTheme.colorScheme
     Scaffold(
@@ -76,6 +78,7 @@ fun HomeScreen(
             MenuKartica("Pregled računa", "Povijest, ispis i email", Icons.Filled.List, cs.secondaryContainer, cs.onSecondaryContainer, onHistory)
             MenuKartica("Šifrarnik artikala", "Spremljeni artikli i usluge", Icons.Filled.ShoppingCart, cs.tertiaryContainer, cs.onTertiaryContainer, onArticles)
             MenuKartica("Postavke tvrtke", "Certifikat, prostor, numeracija", Icons.Filled.Settings, cs.surfaceVariant, cs.onSurfaceVariant, onSettings)
+            MenuKartica("Sigurnosna kopija", "Izvoz/uvoz svih podataka", Icons.Filled.CloudUpload, cs.surfaceVariant, cs.onSurfaceVariant, onBackup)
         }
     }
 }

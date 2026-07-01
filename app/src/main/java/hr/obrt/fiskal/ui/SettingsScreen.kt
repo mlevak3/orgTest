@@ -1,5 +1,8 @@
 package hr.obrt.fiskal.ui
 
+import android.Manifest
+import android.content.pm.PackageManager
+import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.*
@@ -14,12 +17,16 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
+import androidx.core.content.ContextCompat
 import hr.obrt.fiskal.data.Tvrtka
+import hr.obrt.fiskal.fiskal.BluetoothPrinter
 import hr.obrt.fiskal.fiskal.CaStore
+import hr.obrt.fiskal.fiskal.EscPosReceiptBuilder
 import hr.obrt.fiskal.fiskal.FiskalCertificate
 import hr.obrt.fiskal.fiskal.FiskalClient
 import hr.obrt.fiskal.fiskal.FiskalOkolina
 import hr.obrt.fiskal.fiskal.TlsTrust
+import hr.obrt.fiskal.model.NacinPlac
 import hr.obrt.fiskal.model.OznSlijed
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -48,6 +55,30 @@ fun SettingsScreen(vm: AppViewModel, onClose: () -> Unit) {
     var certInfo by remember { mutableStateOf(certStatus(store.certPostoji(company.id))) }
     var caInfo by remember { mutableStateOf(caStatus(store.caPostoji(company.id))) }
     var poruka by remember { mutableStateOf<String?>(null) }
+    var printerAddress by remember { mutableStateOf(company.printerAddress) }
+    var printerName by remember { mutableStateOf<String?>(null) }
+    var zadanaPdvStopa by remember { mutableStateOf(company.zadanaPdvStopa) }
+    var zadaniNacinPlac by remember { mutableStateOf(company.zadaniNacinPlac) }
+    var zadanaJedMjere by remember { mutableStateOf(company.zadanaJedMjere) }
+
+    var pokaziBirac by remember { mutableStateOf(false) }
+    val btPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        if (granted) pokaziBirac = true else poruka = "Bluetooth dozvola nije odobrena."
+    }
+    fun otvoriBirac() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S &&
+            ContextCompat.checkSelfPermission(ctx, Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED
+        ) {
+            btPermission.launch(Manifest.permission.BLUETOOTH_CONNECT)
+        } else {
+            pokaziBirac = true
+        }
+    }
+    LaunchedEffect(printerAddress) {
+        if (printerAddress.isNotBlank()) {
+            printerName = BluetoothPrinter.uparenaUredaji(ctx).firstOrNull { it.address == printerAddress }?.name
+        }
+    }
 
     val certPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri != null) runCatching {
@@ -74,6 +105,8 @@ fun SettingsScreen(vm: AppViewModel, onClose: () -> Unit) {
             naziv = naziv, oib = oib, uSustavuPdv = pdv, oznPosPr = posPr, oznNapUr = napUr,
             oznSlijed = slijed, oibOper = oper, okolina = okolina, ignoreTls = ignoreTls,
             sljedeciBroj = broj.toLongOrNull() ?: 1L,
+            printerAddress = printerAddress,
+            zadanaPdvStopa = zadanaPdvStopa, zadaniNacinPlac = zadaniNacinPlac, zadanaJedMjere = zadanaJedMjere,
         )
         vm.saveCompany(azurirana)
         onClose()
@@ -193,6 +226,49 @@ fun SettingsScreen(vm: AppViewModel, onClose: () -> Unit) {
                 modifier = Modifier.fillMaxWidth(),
             )
 
+            Divider()
+            Text("POS pisač (Bluetooth)", style = MaterialTheme.typography.titleMedium)
+            Text(
+                if (printerAddress.isBlank()) "Nije odabran pisač."
+                else "Odabran: ${printerName ?: printerAddress}",
+                style = MaterialTheme.typography.bodySmall,
+            )
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Button(onClick = { otvoriBirac() }) { Text("Odaberi pisač") }
+                if (printerAddress.isNotBlank()) {
+                    OutlinedButton(onClick = {
+                        poruka = "Šaljem testni ispis…"
+                        scope.launch {
+                            val bytes = EscPosReceiptBuilder.buildTestPage(naziv.ifBlank { "Fiskal Obrt" })
+                            val res = withContext(Dispatchers.IO) { BluetoothPrinter.posalji(ctx, printerAddress, bytes) }
+                            poruka = res.fold({ "Testni ispis poslan." }, { "Ispis nije uspio: ${it.message}" })
+                        }
+                    }) { Text("Testni ispis") }
+                    OutlinedButton(onClick = { printerAddress = ""; printerName = null }) { Text("Ukloni") }
+                }
+            }
+
+            Divider()
+            Text("Zadane vrijednosti", style = MaterialTheme.typography.titleMedium)
+            Text("Ubrzavaju unos novog računa i artikla.", style = MaterialTheme.typography.bodySmall)
+            if (pdv) {
+                OutlinedTextField(
+                    value = zadanaPdvStopa, onValueChange = { zadanaPdvStopa = it },
+                    label = { Text("Zadana PDV stopa (%)") },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
+            OutlinedTextField(
+                value = zadanaJedMjere, onValueChange = { zadanaJedMjere = it },
+                label = { Text("Zadana jedinica mjere") }, modifier = Modifier.fillMaxWidth(),
+            )
+            EnumRedak(
+                "Zadani način plaćanja",
+                NacinPlac.entries.map { it to it.oznaka },
+                zadaniNacinPlac,
+            ) { zadaniNacinPlac = it }
+
             poruka?.let { Text(it, color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.bodySmall) }
 
             Button(
@@ -222,6 +298,28 @@ fun SettingsScreen(vm: AppViewModel, onClose: () -> Unit) {
             }
             Spacer(Modifier.height(24.dp))
         }
+    }
+
+    if (pokaziBirac) {
+        val uredaji = remember { BluetoothPrinter.uparenaUredaji(ctx) }
+        AlertDialog(
+            onDismissRequest = { pokaziBirac = false },
+            title = { Text("Odaberi Bluetooth pisač") },
+            text = {
+                if (uredaji.isEmpty()) {
+                    Text("Nema uparenih Bluetooth uređaja. Upari pisač prvo u Android postavkama (Bluetooth).")
+                } else {
+                    Column {
+                        uredaji.forEach { d ->
+                            TextButton(onClick = {
+                                printerAddress = d.address; printerName = d.name; pokaziBirac = false
+                            }) { Text("${d.name} (${d.address})") }
+                        }
+                    }
+                }
+            },
+            confirmButton = { TextButton(onClick = { pokaziBirac = false }) { Text("Zatvori") } },
+        )
     }
 }
 
