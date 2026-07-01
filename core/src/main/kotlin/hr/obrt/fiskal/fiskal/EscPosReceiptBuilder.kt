@@ -33,8 +33,11 @@ object EscPosReceiptBuilder {
         fun ln(s: String = "") { text(s); text("\n") }
         fun align(a: Int) = raw(intArrayOf(ESC, 0x61, a)) // 0=left 1=center 2=right
         fun bold(on: Boolean) = raw(intArrayOf(ESC, 0x45, if (on) 1 else 0))
-        fun bigOn() = raw(intArrayOf(GS, 0x21, 0x11)) // dvostruka širina+visina
+        // Samo dvostruka VISINA (ne i širina) — ostaje 32 stupca po retku, tekst se ne lomi.
+        fun bigOn() = raw(intArrayOf(GS, 0x21, 0x01))
         fun bigOff() = raw(intArrayOf(GS, 0x21, 0x00))
+        // Font B (uži znakovi) — koristi se za JIR/ZKI da stanu u jedan redak.
+        fun fontB(on: Boolean) = raw(intArrayOf(ESC, 0x4D, if (on) 1 else 0))
 
         raw(intArrayOf(ESC, 0x40)) // init
 
@@ -62,7 +65,7 @@ object EscPosReceiptBuilder {
         ln("=".repeat(WIDTH))
 
         bigOn()
-        ln(redak("TOTAL:", "${FiskalFormat.amount(r.iznosUkupno)} EUR", WIDTH / 2))
+        ln(redak("TOTAL:", "${FiskalFormat.amount(r.iznosUkupno)} EUR", WIDTH))
         bigOff()
         ln("-".repeat(WIDTH))
 
@@ -80,24 +83,26 @@ object EscPosReceiptBuilder {
                 ln(stupci(FiskalFormat.amount(g.stopa), FiskalFormat.amount(g.osnovica), FiskalFormat.amount(g.iznos), FiskalFormat.amount(g.osnovica.add(g.iznos))))
                 sumOsn = sumOsn.add(g.osnovica); sumPdv = sumPdv.add(g.iznos)
             }
-            ln(stupci("", "TOTAL:", "", ""))
-            ln(stupci("", FiskalFormat.amount(sumOsn), FiskalFormat.amount(sumPdv), FiskalFormat.amount(sumOsn.add(sumPdv))))
+            ln(stupci("TOTAL:", FiskalFormat.amount(sumOsn), FiskalFormat.amount(sumPdv), FiskalFormat.amount(sumOsn.add(sumPdv))))
         } else {
             ln("-".repeat(WIDTH))
             ln("Nije u sustavu PDV-a.")
         }
         ln("=".repeat(WIDTH))
 
+        // Font B (uži znakovi) da ZKI i JIR stanu u jedan redak.
+        fontB(true)
         ln("ZKI: ${data.zki}")
         ln("JIR: ${data.jir ?: "(nije dodijeljen - naknadna dostava)"}")
+        fontB(false)
         ln()
 
         align(1)
         qrCode(::bytes, ::raw, data.qrUrl)
-        text("\n")
-        ln("Provjera: porezna.gov.hr/rn")
-        ln()
-        bold(true); ln("Hvala na posjeti!"); bold(false)
+        text("\n\n")
+        fontB(true)
+        ln("Hvala. Thank you. Grazie. Danke.")
+        fontB(false)
         align(0)
 
         text("\n\n\n")
@@ -106,11 +111,19 @@ object EscPosReceiptBuilder {
         return out.toByteArray()
     }
 
-    /** Četiri stupca jednakih širina unutar [WIDTH] (za tablicu rekapitulacije poreza). */
+    /**
+     * Četiri stupca jednakih širina unutar [WIDTH] (za tablicu rekapitulacije poreza).
+     * Zadnji znak svakog stupca (osim posljednjeg) rezerviran je kao razmak, tako da se
+     * susjedni stupci ne slijepe kad tekst točno dosegne širinu stupca.
+     */
     private fun stupci(a: String, b: String, c: String, d: String): String {
         val w = WIDTH / 4
-        fun cell(s: String) = if (s.length >= w) s.take(w) else s.padEnd(w)
-        return cell(a) + cell(b) + cell(c) + cell(d)
+        fun cell(s: String, zadnji: Boolean): String {
+            val maxSadrzaj = if (zadnji) w else w - 1
+            val skraceno = if (s.length > maxSadrzaj) s.take(maxSadrzaj) else s
+            return if (zadnji) skraceno else skraceno.padEnd(w)
+        }
+        return cell(a, false) + cell(b, false) + cell(c, false) + cell(d, true)
     }
 
     /** Kratka testna stranica — provjera veze i ispravnosti pisača. */

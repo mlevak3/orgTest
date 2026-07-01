@@ -69,6 +69,33 @@ class EscPosReceiptBuilderTest {
     }
 
     @Test
+    fun redci_ne_prelaze_32_stupca_i_stupci_se_ne_slijepe() {
+        val b = EscPosReceiptBuilder.build(data)
+        val redci = String(b, Charsets.US_ASCII).lines()
+
+        // TOTAL redak (dvostruka visina, ali normalna širina) mora stati u 32 stupca.
+        val totalRedak = redci.first { it.startsWith("TOTAL:") }
+        assertTrue("TOTAL redak predugačak: '$totalRedak'", totalRedak.length <= 32)
+
+        // Stupci rekapitulacije poreza ne smiju se slijepiti (npr. "OsnovicaPDV").
+        assertTrue(!redci.any { it.contains("OsnovicaPDV") })
+
+        // Redak "TOTAL:" unutar rekapitulacije poreza ima osnovicu/PDV/ukupno u istom retku.
+        val pdvTotalRedak = redci.first { it.contains("TOTAL:") && it.contains("100.00") }
+        assertTrue(pdvTotalRedak.contains("25.00"))
+        assertTrue(pdvTotalRedak.contains("125.00"))
+    }
+
+    @Test
+    fun ne_sadrzi_uklonjeni_redak_i_sadrzi_novi_tekst_zahvale() {
+        val b = EscPosReceiptBuilder.build(data)
+        val text = String(b, Charsets.US_ASCII)
+        // Redak "Provjera: ..." je uklonjen (URL ostaje samo unutar QR podataka, ne i kao tekst ispod).
+        assertTrue(!text.contains("Provjera:"))
+        assertTrue(text.contains("Hvala. Thank you. Grazie. Danke."))
+    }
+
+    @Test
     fun qr_zaglavlje_ima_ispravan_point_length() {
         val b = EscPosReceiptBuilder.build(data)
         val payloadLen = data.qrUrl.toByteArray(Charsets.UTF_8).size + 3
