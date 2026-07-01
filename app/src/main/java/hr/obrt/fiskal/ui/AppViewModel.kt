@@ -8,7 +8,10 @@ import androidx.lifecycle.viewModelScope
 import hr.obrt.fiskal.data.Artikl
 import hr.obrt.fiskal.data.ArticleStore
 import hr.obrt.fiskal.data.CompanyStore
+import hr.obrt.fiskal.data.Djelatnost
 import hr.obrt.fiskal.data.InvoiceStore
+import hr.obrt.fiskal.data.NaplatniUredaj
+import hr.obrt.fiskal.data.PoslovniProstor
 import hr.obrt.fiskal.data.SavedInvoice
 import hr.obrt.fiskal.data.Tvrtka
 import hr.obrt.fiskal.fiskal.CaStore
@@ -18,8 +21,10 @@ import hr.obrt.fiskal.fiskal.FiskalRezultat
 import hr.obrt.fiskal.fiskal.FiskalService
 import hr.obrt.fiskal.fiskal.ReceiptData
 import hr.obrt.fiskal.model.NacinPlac
+import hr.obrt.fiskal.model.OznSlijed
 import hr.obrt.fiskal.model.Racun
 import hr.obrt.fiskal.model.Stavka
+import hr.obrt.fiskal.model.Zaglavlje
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -55,6 +60,12 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     val companies = mutableStateListOf<Tvrtka>()
     val selected = mutableStateOf<Tvrtka?>(null)
     val editing = mutableStateOf<Tvrtka?>(null)
+
+    // --- Odabir djelatnosti / poslovnog prostora / naplatnog uređaja (za novi račun) ---
+    val selectedDjelatnost = mutableStateOf<Djelatnost?>(null)
+    val selectedProstor = mutableStateOf<PoslovniProstor?>(null)
+    val selectedUredjaj = mutableStateOf<NaplatniUredaj?>(null)
+    val brojRacuna = mutableStateOf("1")
 
     // --- Stanje računa ---
     val stavke = mutableStateListOf(StavkaInput())
@@ -92,7 +103,59 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     fun selectCompany(t: Tvrtka) {
         companyStore.odabranaId = t.id
         selected.value = t
+        pripremiNoviRacun()
+    }
+
+    // --- Djelatnost / poslovni prostor / naplatni uređaj ---
+
+    /** Treba li prikazati zaseban ekran odabira djelatnosti (>1 djelatnost). */
+    fun trebaOdabirDjelatnosti(): Boolean = (selected.value?.djelatnosti?.size ?: 0) > 1
+
+    /** Postavlja zadanu djelatnost tvrtke (i njome zadani prostor/uređaj/broj) te čisti obrazac. */
+    fun pripremiNoviRacun() {
+        val t = selected.value ?: return
+        odaberiDjelatnost(t.zadanaDjelatnost())
         resetRacun()
+    }
+
+    fun odaberiDjelatnost(d: Djelatnost) {
+        selectedDjelatnost.value = d
+        odaberiProstor(d.zadaniProstor())
+    }
+
+    fun odaberiProstor(p: PoslovniProstor) {
+        selectedProstor.value = p
+        val d = selectedDjelatnost.value
+        val zadani = d?.zadaniNaplatniUredjajId
+        val u = p.naplatniUredjaji.firstOrNull { it.id == zadani } ?: p.naplatniUredjaji.first()
+        odaberiUredjaj(u)
+    }
+
+    fun odaberiUredjaj(u: NaplatniUredaj) {
+        selectedUredjaj.value = u
+        azurirajPredlozeniBroj()
+    }
+
+    fun setBrojRacuna(v: String) { brojRacuna.value = v.filter(Char::isDigit) }
+
+    private fun azurirajPredlozeniBroj() {
+        val d = selectedDjelatnost.value ?: return
+        val p = selectedProstor.value ?: return
+        val u = selectedUredjaj.value ?: return
+        brojRacuna.value = (if (d.oznSlijed == OznSlijed.P) p.sljedeciBroj else u.sljedeciBroj).toString()
+    }
+
+    /** Nakon uspješne fiskalizacije: ponovno učita tvrtku i postavi selekciju na osvježene objekte. */
+    private fun osvjeziSelekcijuNakonSpremanja(tvrtkaId: String, djelatnostId: String, prostorId: String, uredjajId: String) {
+        refreshCompanies()
+        val t = companies.firstOrNull { it.id == tvrtkaId } ?: return
+        val d = t.djelatnosti.firstOrNull { it.id == djelatnostId } ?: return
+        val p = d.poslovniProstori.firstOrNull { it.id == prostorId } ?: return
+        val u = p.naplatniUredjaji.firstOrNull { it.id == uredjajId } ?: return
+        selectedDjelatnost.value = d
+        selectedProstor.value = p
+        selectedUredjaj.value = u
+        azurirajPredlozeniBroj()
     }
 
     fun newCompany() { editing.value = Tvrtka() }
@@ -179,14 +242,29 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             val rezultat = withContext(Dispatchers.IO) { izvrsi() }
             ucitavanje.value = false
             rezultat.fold(
-                onSuccess = { ishod.value = it; refreshCompanies() },
+                onSuccess = { ishod.value = it },
                 onFailure = { greska.value = it.message ?: "Nepoznata greška." },
             )
+            // Osvježi tvrtku/selekciju bez obzira na ishod (povecajBroj se poziva samo kod uspjeha,
+            // ali refreshCompanies je bezopasan i inače).
+            val t = selected.value
+            val d = selectedDjelatnost.value
+            val p = selectedProstor.value
+            val u = selectedUredjaj.value
+            if (t != null && d != null && p != null && u != null) {
+                osvjeziSelekcijuNakonSpremanja(t.id, d.id, p.id, u.id)
+            }
         }
     }
 
     private fun izvrsi(): Result<FiskalIshod> = runCatching {
         val t = selected.value ?: throw IllegalStateException("Nije odabrana tvrtka.")
+        val djelatnost = selectedDjelatnost.value ?: throw IllegalStateException("Nije odabrana djelatnost.")
+        val prostor = selectedProstor.value ?: throw IllegalStateException("Nije odabran poslovni prostor.")
+        val uredjaj = selectedUredjaj.value ?: throw IllegalStateException("Nije odabran naplatni uređaj.")
+        val broj = brojRacuna.value.toLongOrNull()
+            ?: throw IllegalStateException("Broj računa mora biti cijeli broj.")
+
         val bytes = companyStore.certBytes(t.id)
             ?: throw IllegalStateException("Certifikat nije učitan (Postavke tvrtke).")
         val cert = try {
@@ -197,8 +275,15 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         val caCerts = CaStore.loadExtraCas(getApplication(), companyStore.caBytes(t.id))
 
         val racun = Racun(
-            zaglavlje = t.zaglavlje(),
-            brOznRac = t.sljedeciBroj,
+            zaglavlje = Zaglavlje(
+                oib = t.oib,
+                uSustavuPdv = t.uSustavuPdv,
+                oznPosPr = prostor.oznaka,
+                oznNapUr = uredjaj.oznaka,
+                oznSlijed = djelatnost.oznSlijed,
+                oibOper = t.oibOper.ifBlank { t.oib },
+            ),
+            brOznRac = broj,
             datVrijeme = Date(),
             stavke = stavke.map {
                 fun iznos(x: String) = parse(x).let { v -> if (storno.value) v.negate() else v }
@@ -220,7 +305,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
         spremiUPovijest(t, ishod)
         if (ishod.rezultat is FiskalRezultat.Uspjeh) {
-            companyStore.povecajBroj(t.id)
+            companyStore.povecajBroj(t.id, djelatnost.id, prostor.id, uredjaj.id)
         }
         ishod
     }
@@ -255,6 +340,9 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         if (t.oib.length != 11) return "OIB tvrtke mora imati 11 znamenki (Postavke)."
         if (!companyStore.certPostoji(t.id)) return "FINA certifikat nije učitan (Postavke tvrtke)."
         if (companyStore.lozinka(t.id).isBlank()) return "Lozinka certifikata nije postavljena (Postavke)."
+        if (selectedDjelatnost.value == null || selectedProstor.value == null || selectedUredjaj.value == null)
+            return "Odaberi djelatnost, poslovni prostor i naplatni uređaj."
+        if (brojRacuna.value.toLongOrNull() == null) return "Broj računa mora biti cijeli broj."
         if (stavke.none { it.naziv.isNotBlank() && parse(it.ukupno).signum() != 0 })
             return "Dodaj barem jednu stavku s iznosom (≠ 0)."
         return null

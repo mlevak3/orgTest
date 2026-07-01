@@ -62,7 +62,8 @@ fun CompanyListScreen(
                                 style = MaterialTheme.typography.titleMedium,
                             )
                             Text(
-                                "OIB ${t.oib.ifBlank { "—" }} · ${t.okolina.opis} · sl. račun ${t.sljedeciBroj}",
+                                "OIB ${t.oib.ifBlank { "—" }} · ${t.okolina.opis} · " +
+                                    "${t.djelatnosti.size} " + if (t.djelatnosti.size == 1) "djelatnost" else "djelatnosti",
                                 style = MaterialTheme.typography.bodySmall,
                             )
                         }

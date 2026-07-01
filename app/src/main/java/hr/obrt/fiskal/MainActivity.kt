@@ -9,6 +9,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.viewmodel.compose.viewModel
+import hr.obrt.fiskal.ui.ActivityPickerScreen
 import hr.obrt.fiskal.ui.AppViewModel
 import hr.obrt.fiskal.ui.ArticlesScreen
 import hr.obrt.fiskal.ui.BackupScreen
@@ -17,10 +18,13 @@ import hr.obrt.fiskal.ui.HistoryScreen
 import hr.obrt.fiskal.ui.HomeScreen
 import hr.obrt.fiskal.ui.InvoiceDetailScreen
 import hr.obrt.fiskal.ui.InvoiceScreen
+import hr.obrt.fiskal.ui.InvoiceSetupScreen
 import hr.obrt.fiskal.ui.SettingsScreen
 import hr.obrt.fiskal.ui.theme.FiskalTheme
 
-private enum class Screen { CompanyList, Home, Settings, Invoice, History, Detail, Articles, Backup }
+private enum class Screen {
+    CompanyList, Home, Settings, ActivityPicker, InvoiceSetup, Invoice, History, Detail, Articles, Backup
+}
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -37,6 +41,7 @@ class MainActivity : ComponentActivity() {
                 BackHandler(enabled = screen != Screen.Home && screen != Screen.CompanyList && screen != Screen.Invoice) {
                     screen = when (screen) {
                         Screen.Detail -> Screen.History
+                        Screen.InvoiceSetup -> if (vm.trebaOdabirDjelatnosti()) Screen.ActivityPicker else Screen.Home
                         else -> Screen.Home
                     }
                 }
@@ -52,7 +57,10 @@ class MainActivity : ComponentActivity() {
 
                     Screen.Home -> HomeScreen(
                         vm,
-                        onNewInvoice = { vm.resetRacun(); screen = Screen.Invoice },
+                        onNewInvoice = {
+                            vm.pripremiNoviRacun()
+                            screen = if (vm.trebaOdabirDjelatnosti()) Screen.ActivityPicker else Screen.InvoiceSetup
+                        },
                         onHistory = { vm.loadHistory(); screen = Screen.History },
                         onArticles = { vm.biranjeArtikla.value = false; vm.loadArticles(); screen = Screen.Articles },
                         onSettings = { vm.selected.value?.let { vm.editCompany(it) }; screen = Screen.Settings },
@@ -65,6 +73,19 @@ class MainActivity : ComponentActivity() {
                     Screen.Settings -> SettingsScreen(
                         vm,
                         onClose = { screen = if (vm.selected.value != null) Screen.Home else Screen.CompanyList },
+                    )
+
+                    Screen.ActivityPicker -> ActivityPickerScreen(
+                        vm,
+                        onPicked = { vm.odaberiDjelatnost(it); screen = Screen.InvoiceSetup },
+                        onBack = { screen = Screen.Home },
+                    )
+
+                    Screen.InvoiceSetup -> InvoiceSetupScreen(
+                        vm,
+                        onChangeActivity = if (vm.trebaOdabirDjelatnosti()) ({ screen = Screen.ActivityPicker }) else null,
+                        onContinue = { screen = Screen.Invoice },
+                        onBack = { screen = Screen.Home },
                     )
 
                     Screen.Invoice -> InvoiceScreen(

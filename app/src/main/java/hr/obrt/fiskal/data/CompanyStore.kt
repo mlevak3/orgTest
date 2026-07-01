@@ -70,9 +70,20 @@ class CompanyStore(context: Context) {
 
     fun odabrana(): Tvrtka? = sve().firstOrNull { it.id == odabranaId }
 
-    fun povecajBroj(id: String) {
-        val t = sve().firstOrNull { it.id == id } ?: return
-        t.sljedeciBroj += 1
+    /**
+     * Povećava sljedeći broj računa na ispravnoj razini: po poslovnom prostoru
+     * (OznSlijed = P) ili po naplatnom uređaju (OznSlijed = N).
+     */
+    fun povecajBroj(tvrtkaId: String, djelatnostId: String, prostorId: String, uredjajId: String) {
+        val t = sve().firstOrNull { it.id == tvrtkaId } ?: return
+        val d = t.djelatnosti.firstOrNull { it.id == djelatnostId } ?: return
+        val p = d.poslovniProstori.firstOrNull { it.id == prostorId } ?: return
+        if (d.oznSlijed == hr.obrt.fiskal.model.OznSlijed.P) {
+            p.sljedeciBroj += 1
+        } else {
+            val u = p.naplatniUredjaji.firstOrNull { it.id == uredjajId } ?: return
+            u.sljedeciBroj += 1
+        }
         spremiTvrtku(t)
     }
 
@@ -117,21 +128,35 @@ class CompanyStore(context: Context) {
         val oib = legacy?.getString("oib", "") ?: ""
 
         if (oib.isNotBlank() || staraCert.exists()) {
+            val uredjaj = NaplatniUredaj(
+                oznaka = legacy?.getString("ozn_nap_ur", "1") ?: "1",
+                sljedeciBroj = legacy?.getLong("sljedeci_broj", 1L) ?: 1L,
+            )
+            val prostor = PoslovniProstor(
+                oznaka = legacy?.getString("ozn_pos_pr", "POSL1") ?: "POSL1",
+                sljedeciBroj = legacy?.getLong("sljedeci_broj", 1L) ?: 1L,
+                naplatniUredjaji = mutableListOf(uredjaj),
+            )
+            val djelatnost = Djelatnost(
+                naziv = "Glavna djelatnost",
+                oznSlijed = runCatching {
+                    hr.obrt.fiskal.model.OznSlijed.valueOf(legacy?.getString("ozn_slijed", "P") ?: "P")
+                }.getOrDefault(hr.obrt.fiskal.model.OznSlijed.P),
+                poslovniProstori = mutableListOf(prostor),
+                zadaniPoslovniProstorId = prostor.id,
+                zadaniNaplatniUredjajId = uredjaj.id,
+            )
             val t = Tvrtka(
                 naziv = if (oib.isNotBlank()) "Tvrtka $oib" else "Moja tvrtka",
                 oib = oib,
                 uSustavuPdv = legacy?.getBoolean("u_sustavu_pdv", false) ?: false,
-                oznPosPr = legacy?.getString("ozn_pos_pr", "POSL1") ?: "POSL1",
-                oznNapUr = legacy?.getString("ozn_nap_ur", "1") ?: "1",
-                oznSlijed = runCatching {
-                    hr.obrt.fiskal.model.OznSlijed.valueOf(legacy?.getString("ozn_slijed", "P") ?: "P")
-                }.getOrDefault(hr.obrt.fiskal.model.OznSlijed.P),
                 oibOper = legacy?.getString("oib_oper", "") ?: "",
                 okolina = runCatching {
                     hr.obrt.fiskal.fiskal.FiskalOkolina.valueOf(legacy?.getString("okolina", "TEST") ?: "TEST")
                 }.getOrDefault(hr.obrt.fiskal.fiskal.FiskalOkolina.TEST),
                 ignoreTls = legacy?.getBoolean("ignore_tls", false) ?: false,
-                sljedeciBroj = legacy?.getLong("sljedeci_broj", 1L) ?: 1L,
+                djelatnosti = mutableListOf(djelatnost),
+                zadanaDjelatnostId = djelatnost.id,
             )
             if (staraCert.exists()) runCatching { staraCert.copyTo(certFile(t.id), overwrite = true) }
             if (staraCa.exists()) runCatching { staraCa.copyTo(caFile(t.id), overwrite = true) }

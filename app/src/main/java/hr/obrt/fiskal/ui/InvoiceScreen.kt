@@ -132,11 +132,18 @@ private fun InvoiceForm(vm: AppViewModel, tvrtka: hr.obrt.fiskal.data.Tvrtka?, m
         contentPadding = PaddingValues(top = 8.dp, bottom = 96.dp),
     ) {
         item {
+            val d = vm.selectedDjelatnost.value
+            val p = vm.selectedProstor.value
+            val u = vm.selectedUredjaj.value
             AssistChip(
                 onClick = {},
                 enabled = false,
                 label = {
-                    Text("${tvrtka?.okolina?.opis ?: "—"} · sljedeći br. ${tvrtka?.sljedeciBroj ?: 0}/${tvrtka?.oznPosPr ?: ""}/${tvrtka?.oznNapUr ?: ""}")
+                    Text(
+                        "${tvrtka?.okolina?.opis ?: "—"}" +
+                            (d?.let { " · ${it.opis()}" } ?: "") +
+                            " · br. ${vm.brojRacuna.value}/${p?.oznaka ?: ""}/${u?.oznaka ?: ""}"
+                    )
                 },
             )
         }
