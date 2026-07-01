@@ -13,6 +13,7 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
@@ -211,42 +212,41 @@ fun SettingsScreen(vm: AppViewModel, onClose: () -> Unit) {
         onClose()
     }
 
+    val fiskalTokens = hr.obrt.fiskal.ui.theme.LocalFiskalTokens.current
     Scaffold(
+        containerColor = fiskalTokens.bg,
         topBar = {
-            val cs = MaterialTheme.colorScheme
             Column {
-                TopAppBar(
-                    title = { Text(if (postoji) "Uredi tvrtku" else "Nova tvrtka") },
-                    navigationIcon = { TextButton(onClick = onClose, colors = ButtonDefaults.textButtonColors(contentColor = cs.onPrimary)) { Text("Odustani") } },
-                    colors = TopAppBarDefaults.topAppBarColors(containerColor = cs.primary, titleContentColor = cs.onPrimary),
+                hr.obrt.fiskal.ui.components.LightHeader(
+                    if (postoji) "Uredi tvrtku" else "Nova tvrtka",
+                    onBack = onClose,
                 )
-                ScrollableTabRow(
-                    selectedTabIndex = tab,
-                    containerColor = cs.primaryContainer,
-                    edgePadding = 12.dp,
+                Row(
+                    Modifier
+                        .fillMaxWidth()
+                        .horizontalScroll(rememberScrollState())
+                        .padding(horizontal = hr.obrt.fiskal.ui.theme.FiskalSpacing.screenX, vertical = 4.dp),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
                 ) {
                     TAB_NASLOVI.forEachIndexed { i, naslov ->
-                        Tab(
-                            selected = tab == i,
-                            onClick = { tab = i },
-                            text = { Text(naslov, maxLines = 1) },
-                        )
+                        hr.obrt.fiskal.ui.components.FiskalChip(naslov, tab == i) { tab = i }
                     }
                 }
             }
         },
         bottomBar = {
-            Column(Modifier.padding(12.dp)) {
+            Column(Modifier.padding(hr.obrt.fiskal.ui.theme.FiskalSpacing.screenX)) {
                 poruka?.let {
-                    Text(it, color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.bodySmall)
+                    Text(it, color = fiskalTokens.olive, style = MaterialTheme.typography.bodySmall)
                     Spacer(Modifier.height(6.dp))
                 }
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Button(onClick = { spremi() }, modifier = Modifier.weight(1f)) { Text("Spremi tvrtku") }
-                    if (postoji) OutlinedButton(
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                    hr.obrt.fiskal.ui.components.FiskalPrimaryButton("Spremi tvrtku", onClick = { spremi() }, modifier = Modifier.weight(1f))
+                    if (postoji) hr.obrt.fiskal.ui.components.FiskalOutlineButton(
+                        "Obriši",
                         onClick = { vm.deleteCompany(company); onClose() },
-                        colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error),
-                    ) { Text("Obriši") }
+                        destruktivno = true,
+                    )
                 }
             }
         }

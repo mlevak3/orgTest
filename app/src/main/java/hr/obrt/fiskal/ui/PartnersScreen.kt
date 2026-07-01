@@ -1,89 +1,128 @@
 package hr.obrt.fiskal.ui
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Edit
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material.icons.rounded.Edit
+import androidx.compose.material.icons.rounded.Group
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import hr.obrt.fiskal.data.Partner
+import hr.obrt.fiskal.ui.components.FiskalCard
+import hr.obrt.fiskal.ui.components.FiskalEmptyState
+import hr.obrt.fiskal.ui.components.FiskalTerracottaButton
+import hr.obrt.fiskal.ui.components.LightHeader
+import hr.obrt.fiskal.ui.components.SearchPill
+import hr.obrt.fiskal.ui.theme.FiskalSpacing
+import hr.obrt.fiskal.ui.theme.LocalFiskalTokens
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun PartnersScreen(vm: AppViewModel, onPick: ((Partner) -> Unit)?, onBack: () -> Unit) {
-    Scaffold(
-        topBar = {
-            val cs = MaterialTheme.colorScheme
-            TopAppBar(
-                title = { Text(if (onPick != null) "Odaberi partnera" else "Šifrarnik partnera") },
-                navigationIcon = { TextButton(onClick = onBack, colors = ButtonDefaults.textButtonColors(contentColor = cs.onPrimary)) { Text("Natrag") } },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = cs.primary, titleContentColor = cs.onPrimary),
-            )
-        },
-        floatingActionButton = {
-            ExtendedFloatingActionButton(
-                onClick = { vm.newPartner() },
-                icon = { Icon(Icons.Filled.Add, null) },
-                text = { Text("Novi partner") },
-            )
-        },
-    ) { pad ->
-        var q by remember { mutableStateOf("") }
-        val filtrirani = vm.partners.filter {
-            q.isBlank() || it.naziv.contains(q, true) || it.oib.contains(q, true)
-        }
+    val t = LocalFiskalTokens.current
+    var q by remember { mutableStateOf("") }
+    val filtrirani = vm.partners.filter {
+        q.isBlank() || it.naziv.contains(q, true) || it.oib.contains(q, true)
+    }
 
-        if (vm.partners.isEmpty()) {
-            Box(Modifier.padding(pad).fillMaxSize(), contentAlignment = Alignment.Center) {
-                Text("Šifrarnik je prazan. Dodaj partnera (+).", style = MaterialTheme.typography.bodyLarge)
+    Box(Modifier.fillMaxSize().background(t.bg)) {
+        Column(Modifier.fillMaxSize()) {
+            LightHeader(
+                if (onPick != null) "Odaberi partnera" else "Partneri",
+                "${vm.partners.size} partnera u šifrarniku",
+                onBack = onBack,
+            )
+
+            Box(Modifier.padding(horizontal = FiskalSpacing.screenX)) {
+                SearchPill(q, { q = it }, "Pretraži partnere…")
             }
-        } else {
-            Column(Modifier.padding(pad)) {
-                OutlinedTextField(
-                    value = q, onValueChange = { q = it },
-                    label = { Text("Pretraži partnere") }, singleLine = true,
-                    modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp),
+            Spacer(Modifier.height(FiskalSpacing.stackGap))
+
+            if (filtrirani.isEmpty()) {
+                FiskalEmptyState(
+                    Icons.Rounded.Group,
+                    if (vm.partners.isEmpty()) "Šifrarnik je prazan" else "Nema rezultata",
+                    if (vm.partners.isEmpty()) "Dodaj prvog partnera gumbom ispod." else "Pokušaj drugi pojam pretrage.",
+                    Modifier.padding(horizontal = FiskalSpacing.screenX),
                 )
-                if (filtrirani.isEmpty()) {
-                    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { Text("Nema rezultata.") }
-                } else LazyColumn(
-                    Modifier.padding(horizontal = 12.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
+            } else {
+                LazyColumn(
+                    Modifier.padding(horizontal = FiskalSpacing.screenX),
+                    verticalArrangement = Arrangement.spacedBy(FiskalSpacing.stackGap),
+                    contentPadding = PaddingValues(bottom = FiskalSpacing.listPad),
                 ) {
-                    items(filtrirani) { p ->
+                    itemsIndexed(filtrirani) { index, p ->
                         val pick = onPick
-                        ElevatedCard(onClick = { if (pick != null) pick(p) else vm.editPartner(p) }) {
+                        FiskalCard(Modifier.fillMaxWidth(), onClick = { if (pick != null) pick(p) else vm.editPartner(p) }) {
                             Row(
-                                Modifier.padding(14.dp).fillMaxWidth(),
+                                Modifier.padding(FiskalSpacing.card).fillMaxWidth(),
                                 verticalAlignment = Alignment.CenterVertically,
                             ) {
+                                InicijaliAvatar(p.naziv, index % 2 == 0)
+                                Spacer(Modifier.width(12.dp))
                                 Column(Modifier.weight(1f)) {
-                                    Text(p.naziv.ifBlank { "(bez naziva)" }, style = MaterialTheme.typography.titleMedium)
+                                    Text(p.naziv.ifBlank { "(bez naziva)" }, style = MaterialTheme.typography.bodyLarge, color = t.ink)
                                     Text(
                                         "OIB ${p.oib.ifBlank { "—" }}" + (if (p.adresa.isNotBlank()) " · ${p.adresa}" else ""),
                                         style = MaterialTheme.typography.bodySmall,
+                                        color = t.muted,
                                     )
                                 }
-                                if (pick != null) {
-                                    AssistChip(onClick = { pick(p) }, label = { Text("Odaberi") })
-                                } else {
-                                    IconButton(onClick = { vm.editPartner(p) }) { Icon(Icons.Filled.Edit, "Uredi") }
-                                }
+                                if (pick == null) Icon(
+                                    Icons.Rounded.Edit, "Uredi", tint = t.mutedSoft,
+                                    modifier = Modifier.size(20.dp),
+                                )
                             }
                         }
                     }
-                    item { Spacer(Modifier.height(72.dp)) }
                 }
             }
         }
+
+        FiskalTerracottaButton(
+            "Novi partner",
+            onClick = { vm.newPartner() },
+            modifier = Modifier.align(Alignment.BottomEnd).padding(FiskalSpacing.screenX),
+        )
     }
 
     if (vm.editingPartner.value != null) PartnerDialog(vm)
+}
+
+@Composable
+private fun InicijaliAvatar(naziv: String, olive: Boolean) {
+    val t = LocalFiskalTokens.current
+    val inicijali = naziv.trim().split(Regex("\\s+")).filter { it.isNotBlank() }
+        .take(2).mapNotNull { it.firstOrNull()?.uppercaseChar() }.joinToString("")
+        .ifBlank { "?" }
+    Box(
+        Modifier.size(44.dp).clip(CircleShape).background(if (olive) t.oliveTint else t.terracottaTint),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(
+            inicijali,
+            color = if (olive) t.oliveTintInk else t.terracottaTintInk,
+            fontWeight = FontWeight.Bold,
+            style = MaterialTheme.typography.bodyLarge,
+        )
+    }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)

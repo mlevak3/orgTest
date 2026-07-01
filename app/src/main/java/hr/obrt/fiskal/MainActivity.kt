@@ -4,10 +4,14 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
 import androidx.lifecycle.viewmodel.compose.viewModel
 import hr.obrt.fiskal.ui.ActivityPickerScreen
 import hr.obrt.fiskal.ui.AppViewModel
@@ -22,12 +26,16 @@ import hr.obrt.fiskal.ui.InvoiceSetupScreen
 import hr.obrt.fiskal.ui.PartnersScreen
 import hr.obrt.fiskal.ui.ReportsScreen
 import hr.obrt.fiskal.ui.SettingsScreen
+import hr.obrt.fiskal.ui.components.FiskalBottomNav
+import hr.obrt.fiskal.ui.components.NavTab
 import hr.obrt.fiskal.ui.theme.FiskalTheme
 import hr.obrt.fiskal.data.AppPreferences
 
 private enum class Screen {
     CompanyList, Home, Settings, ActivityPicker, InvoiceSetup, Invoice, History, Detail, Articles, Partners, Backup, Reports
 }
+
+private val BOTTOM_NAV_SCREENS = setOf(Screen.Home, Screen.History, Screen.Partners, Screen.Reports)
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -51,6 +59,12 @@ class MainActivity : ComponentActivity() {
                     }
                 }
 
+                val onNewInvoice = {
+                    vm.pripremiNoviRacun()
+                    screen = if (vm.trebaOdabirDjelatnosti()) Screen.ActivityPicker else Screen.InvoiceSetup
+                }
+
+                Box(Modifier.fillMaxSize()) {
                 when (screen) {
                     Screen.CompanyList -> CompanyListScreen(
                         vm,
@@ -64,10 +78,6 @@ class MainActivity : ComponentActivity() {
                         vm,
                         tema = tema,
                         onToggleTema = { tema = tema.sljedeca(); appPrefs.tema = tema },
-                        onNewInvoice = {
-                            vm.pripremiNoviRacun()
-                            screen = if (vm.trebaOdabirDjelatnosti()) Screen.ActivityPicker else Screen.InvoiceSetup
-                        },
                         onHistory = { vm.loadHistory(); screen = Screen.History },
                         onArticles = { vm.biranjeArtikla.value = false; vm.loadArticles(); screen = Screen.Articles },
                         onPartners = { vm.biranjePartnera.value = false; vm.loadPartners(); screen = Screen.Partners },
@@ -103,11 +113,6 @@ class MainActivity : ComponentActivity() {
                     Screen.Invoice -> InvoiceScreen(
                         vm,
                         onHome = { screen = Screen.Home },
-                        onHistory = { vm.loadHistory(); screen = Screen.History },
-                        onSettings = { vm.selected.value?.let { vm.editCompany(it) }; screen = Screen.Settings },
-                        onArticles = { vm.biranjeArtikla.value = false; vm.loadArticles(); screen = Screen.Articles },
-                        onPickArticle = { vm.biranjeArtikla.value = true; vm.loadArticles(); screen = Screen.Articles },
-                        onPartners = { vm.biranjePartnera.value = false; vm.loadPartners(); screen = Screen.Partners },
                         onPickPartner = { vm.biranjePartnera.value = true; vm.loadPartners(); screen = Screen.Partners },
                     )
 
@@ -147,6 +152,24 @@ class MainActivity : ComponentActivity() {
                         onCopy = { vm.detail.value?.let { vm.kopirajURacun(it) }; screen = Screen.Invoice },
                         onStorno = { vm.detail.value?.let { vm.stornirajRacun(it) }; screen = Screen.Invoice },
                     )
+                }
+
+                if (screen in BOTTOM_NAV_SCREENS) {
+                    FiskalBottomNav(
+                        current = when (screen) {
+                            Screen.History -> NavTab.RACUNI
+                            Screen.Partners -> NavTab.PARTNERI
+                            Screen.Reports -> NavTab.IZVJESTAJI
+                            else -> NavTab.POCETNA
+                        },
+                        onPocetna = { screen = Screen.Home },
+                        onRacuni = { vm.loadHistory(); screen = Screen.History },
+                        onPartneri = { vm.biranjePartnera.value = false; vm.loadPartners(); screen = Screen.Partners },
+                        onIzvjestaji = { screen = Screen.Reports },
+                        onNoviRacun = onNewInvoice,
+                        modifier = Modifier.align(Alignment.BottomCenter),
+                    )
+                }
                 }
             }
         }

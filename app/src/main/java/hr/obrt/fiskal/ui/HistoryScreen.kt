@@ -1,17 +1,26 @@
 package hr.obrt.fiskal.ui
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Print
-import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.icons.filled.Share
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material.icons.rounded.Print
+import androidx.compose.material.icons.rounded.ReceiptLong
+import androidx.compose.material.icons.rounded.Share
+import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -19,88 +28,102 @@ import hr.obrt.fiskal.data.SavedInvoice
 import hr.obrt.fiskal.fiskal.FiskalFormat
 import hr.obrt.fiskal.fiskal.InvoiceShare
 import hr.obrt.fiskal.fiskal.ReceiptPrinter
+import hr.obrt.fiskal.ui.components.FiskalCard
+import hr.obrt.fiskal.ui.components.FiskalChip
+import hr.obrt.fiskal.ui.components.FiskalEmptyState
+import hr.obrt.fiskal.ui.components.LightHeader
+import hr.obrt.fiskal.ui.components.SearchPill
+import hr.obrt.fiskal.ui.components.StatusBadge
+import hr.obrt.fiskal.ui.theme.FiskalSpacing
+import hr.obrt.fiskal.ui.theme.LocalFiskalTokens
 import java.math.BigDecimal
 import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Date
 import java.util.Locale
 
-@OptIn(ExperimentalMaterial3Api::class)
+private enum class FilterRacuna(val naziv: String) { SVI("Svi"), FISKALIZIRANI("Fiskalizirani"), NEFISKALIZIRANI("Nefiskalizirani") }
+
 @Composable
 fun HistoryScreen(vm: AppViewModel, onOpen: (SavedInvoice) -> Unit, onBack: () -> Unit) {
-    val cs = MaterialTheme.colorScheme
+    val t = LocalFiskalTokens.current
+    val ctx = LocalContext.current
     val fmt = remember { SimpleDateFormat("dd.MM.yyyy HH:mm", Locale.ROOT) }
     var q by remember { mutableStateOf("") }
+    var filter by remember { mutableStateOf(FilterRacuna.SVI) }
 
     val danas = pocetakDana()
     val mjesec = pocetakMjeseca()
-    val prometDanas = zbroj(vm.history) { it.jir != null && it.createdAt >= danas }
-    val prometMjesec = zbroj(vm.history) { it.jir != null && it.createdAt >= mjesec }
+    val prometDanas = zbroj(vm.history) { it.createdAt >= danas }
+    val prometMjesec = zbroj(vm.history) { it.createdAt >= mjesec }
 
-    val filtrirani = vm.history.filter { si ->
-        q.isBlank() ||
-            si.brojRacuna().contains(q, true) ||
-            (si.jir ?: "").contains(q, true) ||
-            si.kupac.contains(q, true) ||
-            FiskalFormat.amount(si.racun.iznosUkupno).contains(q)
-    }
-
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("Računi — ${vm.selected.value?.opis() ?: ""}", maxLines = 1) },
-                navigationIcon = { TextButton(onClick = onBack, colors = ButtonDefaults.textButtonColors(contentColor = cs.onPrimary)) { Text("Početna") } },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = cs.primary, titleContentColor = cs.onPrimary),
-            )
+    val filtrirani = vm.history
+        .filter { si ->
+            when (filter) {
+                FilterRacuna.SVI -> true
+                FilterRacuna.FISKALIZIRANI -> si.jir != null
+                FilterRacuna.NEFISKALIZIRANI -> si.jir == null
+            }
         }
-    ) { pad ->
-        Column(Modifier.padding(pad).fillMaxSize()) {
-            Card(
-                Modifier.fillMaxWidth().padding(12.dp),
-                colors = CardDefaults.cardColors(containerColor = cs.secondaryContainer, contentColor = cs.onSecondaryContainer),
-            ) {
-                Row(Modifier.padding(16.dp).fillMaxWidth()) {
+        .filter { si ->
+            q.isBlank() ||
+                si.brojRacuna().contains(q, true) ||
+                (si.jir ?: "").contains(q, true) ||
+                si.kupac.contains(q, true) ||
+                FiskalFormat.amount(si.racun.iznosUkupno).contains(q)
+        }
+
+    Column(Modifier.fillMaxSize().background(t.bg)) {
+        LightHeader("Računi", "${vm.history.size} računa")
+
+        Column(Modifier.padding(horizontal = FiskalSpacing.screenX), verticalArrangement = Arrangement.spacedBy(FiskalSpacing.stackGap)) {
+            FiskalCard(Modifier.fillMaxWidth()) {
+                Row(Modifier.padding(FiskalSpacing.card).fillMaxWidth()) {
                     PrometStavka("Promet danas", prometDanas, Modifier.weight(1f))
                     PrometStavka("Ovaj mjesec", prometMjesec, Modifier.weight(1f))
                 }
             }
-            OutlinedTextField(
-                value = q, onValueChange = { q = it },
-                label = { Text("Pretraži (broj, JIR, kupac, iznos)") },
-                leadingIcon = { Icon(Icons.Filled.Search, null) },
-                singleLine = true,
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp),
-            )
 
-            if (filtrirani.isEmpty()) {
-                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    Text(if (vm.history.isEmpty()) "Još nema spremljenih računa." else "Nema rezultata za pretragu.")
+            SearchPill(q, { q = it }, "Pretraži broj, JIR, kupca, iznos…")
+
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                FilterRacuna.entries.forEach { f ->
+                    FiskalChip(f.naziv, filter == f) { filter = f }
                 }
-            } else {
-                val ctx = LocalContext.current
-                LazyColumn(
-                    Modifier.padding(horizontal = 12.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
-                    contentPadding = PaddingValues(vertical = 8.dp),
-                ) {
-                    items(filtrirani) { si ->
-                        ElevatedCard(onClick = { onOpen(si) }) {
-                            Column(Modifier.padding(14.dp).fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Text("Račun ${si.brojRacuna()}", style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
-                                    Text("${FiskalFormat.amount(si.racun.iznosUkupno)} €", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                                }
-                                Text(fmt.format(Date(si.createdAt)), style = MaterialTheme.typography.bodySmall)
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    StatusCip(si)
-                                    Spacer(Modifier.weight(1f))
-                                    IconButton(onClick = { ReceiptPrinter.print(ctx, vm.receiptFromSaved(si)) }) {
-                                        Icon(Icons.Filled.Print, "Ispiši", modifier = Modifier.size(20.dp))
-                                    }
-                                    IconButton(onClick = { InvoiceShare.sharePdf(ctx, vm.receiptFromSaved(si)) }) {
-                                        Icon(Icons.Filled.Share, "Podijeli", modifier = Modifier.size(20.dp))
-                                    }
-                                }
+            }
+        }
+
+        if (filtrirani.isEmpty()) {
+            FiskalEmptyState(
+                Icons.Rounded.ReceiptLong,
+                if (vm.history.isEmpty()) "Još nema računa" else "Nema rezultata",
+                if (vm.history.isEmpty()) "Novi račun kreiraš gumbom + u donjoj navigaciji." else "Pokušaj drugi pojam pretrage ili filter.",
+                Modifier.padding(horizontal = FiskalSpacing.screenX),
+            )
+        } else {
+            LazyColumn(
+                Modifier.padding(horizontal = FiskalSpacing.screenX),
+                verticalArrangement = Arrangement.spacedBy(FiskalSpacing.stackGap),
+                contentPadding = PaddingValues(top = FiskalSpacing.stackGap, bottom = FiskalSpacing.listPad),
+            ) {
+                items(filtrirani) { si ->
+                    FiskalCard(Modifier.fillMaxWidth(), onClick = { onOpen(si) }) {
+                        Column(Modifier.padding(FiskalSpacing.card), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text("Račun ${si.brojRacuna()}", style = MaterialTheme.typography.titleMedium, color = t.ink, modifier = Modifier.weight(1f))
+                                Text(hrEur(si.racun.iznosUkupno), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = t.ink)
+                            }
+                            Text(
+                                fmt.format(Date(si.createdAt)) + " · " + si.racun.nacinPlac.opis,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = t.muted,
+                            )
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                StatusBadge(si.jir != null, Modifier.weight(1f, fill = false))
+                                Spacer(Modifier.weight(1f))
+                                KrugAkcija(Icons.Rounded.Print) { ReceiptPrinter.print(ctx, vm.receiptFromSaved(si)) }
+                                Spacer(Modifier.width(8.dp))
+                                KrugAkcija(Icons.Rounded.Share) { InvoiceShare.sharePdf(ctx, vm.receiptFromSaved(si)) }
                             }
                         }
                     }
@@ -111,30 +134,25 @@ fun HistoryScreen(vm: AppViewModel, onOpen: (SavedInvoice) -> Unit, onBack: () -
 }
 
 @Composable
-private fun PrometStavka(naziv: String, iznos: BigDecimal, modifier: Modifier) {
-    Column(modifier) {
-        Text(naziv, style = MaterialTheme.typography.labelMedium)
-        Text("${iznos.toPlainString()} €", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-    }
+private fun KrugAkcija(icon: androidx.compose.ui.graphics.vector.ImageVector, onClick: () -> Unit) {
+    val t = LocalFiskalTokens.current
+    Box(
+        Modifier
+            .size(36.dp)
+            .clip(CircleShape)
+            .background(t.oliveTint)
+            .clickable(onClick = onClick),
+        contentAlignment = Alignment.Center,
+    ) { Icon(icon, null, tint = t.oliveTintInk, modifier = Modifier.size(18.dp)) }
 }
 
 @Composable
-private fun StatusCip(si: SavedInvoice) {
-    val (tekst, boja) = when {
-        si.jir != null -> "Fiskaliziran ✓" to Color(0xFF2E7D32)
-        si.status.startsWith("NEIZVJESNO") -> "Neizvjesno — provjeri" to Color(0xFFB26A00)
-        else -> "Nije fiskaliziran" to MaterialTheme.colorScheme.error
+private fun PrometStavka(naziv: String, iznos: BigDecimal, modifier: Modifier) {
+    val t = LocalFiskalTokens.current
+    Column(modifier) {
+        Text(naziv, style = MaterialTheme.typography.labelMedium, color = t.muted)
+        Text(hrEur(iznos), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = t.ink)
     }
-    AssistChip(
-        onClick = {},
-        enabled = false,
-        label = { Text(tekst) },
-        colors = AssistChipDefaults.assistChipColors(
-            disabledLabelColor = boja,
-            disabledContainerColor = boja.copy(alpha = 0.12f),
-        ),
-        border = null,
-    )
 }
 
 private fun zbroj(list: List<SavedInvoice>, uvjet: (SavedInvoice) -> Boolean): BigDecimal =

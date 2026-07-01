@@ -1,87 +1,106 @@
 package hr.obrt.fiskal.ui
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Edit
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material.icons.rounded.Edit
+import androidx.compose.material.icons.rounded.Inventory2
+import androidx.compose.material.icons.rounded.Sell
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import hr.obrt.fiskal.data.Artikl
+import hr.obrt.fiskal.ui.components.FiskalCard
+import hr.obrt.fiskal.ui.components.FiskalEmptyState
+import hr.obrt.fiskal.ui.components.FiskalTerracottaButton
+import hr.obrt.fiskal.ui.components.IconTile
+import hr.obrt.fiskal.ui.components.LightHeader
+import hr.obrt.fiskal.ui.components.SearchPill
+import hr.obrt.fiskal.ui.theme.FiskalSpacing
+import hr.obrt.fiskal.ui.theme.LocalFiskalTokens
 import java.math.BigDecimal
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ArticlesScreen(vm: AppViewModel, onPick: ((Artikl) -> Unit)?, onBack: () -> Unit) {
-    Scaffold(
-        topBar = {
-            val cs = MaterialTheme.colorScheme
-            TopAppBar(
-                title = { Text(if (onPick != null) "Odaberi artikl" else "Šifrarnik artikala") },
-                navigationIcon = { TextButton(onClick = onBack, colors = ButtonDefaults.textButtonColors(contentColor = cs.onPrimary)) { Text("Natrag") } },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = cs.primary, titleContentColor = cs.onPrimary),
-            )
-        },
-        floatingActionButton = {
-            ExtendedFloatingActionButton(
-                onClick = { vm.newArticle() },
-                icon = { Icon(Icons.Filled.Add, null) },
-                text = { Text("Novi artikl") },
-            )
-        },
-    ) { pad ->
-        var q by remember { mutableStateOf("") }
-        val filtrirani = vm.articles.filter { q.isBlank() || it.naziv.contains(q, ignoreCase = true) }
+    val t = LocalFiskalTokens.current
+    var q by remember { mutableStateOf("") }
+    val filtrirani = vm.articles.filter { q.isBlank() || it.naziv.contains(q, ignoreCase = true) }
 
-        if (vm.articles.isEmpty()) {
-            Box(Modifier.padding(pad).fillMaxSize(), contentAlignment = Alignment.Center) {
-                Text("Šifrarnik je prazan. Dodaj artikl (+).", style = MaterialTheme.typography.bodyLarge)
+    Box(Modifier.fillMaxSize().background(t.bg)) {
+        Column(Modifier.fillMaxSize()) {
+            LightHeader(
+                if (onPick != null) "Odaberi artikl" else "Artikli",
+                "${vm.articles.size} artikla u šifrarniku",
+                onBack = onBack,
+            )
+
+            Box(Modifier.padding(horizontal = FiskalSpacing.screenX)) {
+                SearchPill(q, { q = it }, "Pretraži artikle…")
             }
-        } else {
-            Column(Modifier.padding(pad)) {
-                OutlinedTextField(
-                    value = q, onValueChange = { q = it },
-                    label = { Text("Pretraži artikle") }, singleLine = true,
-                    modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp),
+            Spacer(Modifier.height(FiskalSpacing.stackGap))
+
+            if (filtrirani.isEmpty()) {
+                FiskalEmptyState(
+                    Icons.Rounded.Inventory2,
+                    if (vm.articles.isEmpty()) "Šifrarnik je prazan" else "Nema rezultata",
+                    if (vm.articles.isEmpty()) "Dodaj prvi artikl gumbom ispod." else "Pokušaj drugi pojam pretrage.",
+                    Modifier.padding(horizontal = FiskalSpacing.screenX),
                 )
-                if (filtrirani.isEmpty()) {
-                    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { Text("Nema rezultata.") }
-                } else LazyColumn(
-                    Modifier.padding(horizontal = 12.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
+            } else {
+                LazyColumn(
+                    Modifier.padding(horizontal = FiskalSpacing.screenX),
+                    verticalArrangement = Arrangement.spacedBy(FiskalSpacing.stackGap),
+                    contentPadding = PaddingValues(bottom = FiskalSpacing.listPad),
                 ) {
-                items(filtrirani) { a ->
-                    val pick = onPick
-                    ElevatedCard(onClick = { if (pick != null) pick(a) else vm.editArticle(a) }) {
-                        Row(
-                            Modifier.padding(14.dp).fillMaxWidth(),
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            Column(Modifier.weight(1f)) {
-                                Text(a.naziv.ifBlank { "(bez naziva)" }, style = MaterialTheme.typography.titleMedium)
-                                Text(
-                                    "${a.jedCijena.toPlainString()} € / ${a.jedMjere} · PDV ${a.pdvStopa.toPlainString()}%",
-                                    style = MaterialTheme.typography.bodySmall,
+                    items(filtrirani) { a ->
+                        val pick = onPick
+                        FiskalCard(Modifier.fillMaxWidth(), onClick = { if (pick != null) pick(a) else vm.editArticle(a) }) {
+                            Row(
+                                Modifier.padding(FiskalSpacing.card).fillMaxWidth(),
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                IconTile(Icons.Rounded.Sell)
+                                Spacer(Modifier.width(12.dp))
+                                Column(Modifier.weight(1f)) {
+                                    Text(a.naziv.ifBlank { "(bez naziva)" }, style = MaterialTheme.typography.bodyLarge, color = t.ink)
+                                    Text(
+                                        "${hrEur(a.jedCijena)} / ${a.jedMjere} · PDV ${a.pdvStopa.toPlainString()}%",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = t.muted,
+                                    )
+                                }
+                                if (pick == null) Icon(
+                                    Icons.Rounded.Edit, "Uredi", tint = t.mutedSoft,
+                                    modifier = Modifier.size(20.dp),
                                 )
-                            }
-                            if (pick != null) {
-                                AssistChip(onClick = { pick(a) }, label = { Text("Dodaj") })
-                            } else {
-                                IconButton(onClick = { vm.editArticle(a) }) { Icon(Icons.Filled.Edit, "Uredi") }
                             }
                         }
                     }
                 }
-                item { Spacer(Modifier.height(72.dp)) }
-                }
             }
         }
+
+        FiskalTerracottaButton(
+            "Novi artikl",
+            onClick = { vm.newArticle() },
+            modifier = Modifier.align(Alignment.BottomEnd).padding(FiskalSpacing.screenX),
+        )
     }
 
     if (vm.editingArticle.value != null) ArtiklDialog(vm)

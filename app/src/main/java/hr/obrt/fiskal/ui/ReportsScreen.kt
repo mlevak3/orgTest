@@ -3,12 +3,20 @@ package hr.obrt.fiskal.ui
 import android.app.DatePickerDialog
 import android.app.TimePickerDialog
 import android.content.Context
+import androidx.compose.foundation.background
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.material3.*
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Assessment
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -20,14 +28,20 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import hr.obrt.fiskal.fiskal.FiskalFormat
+import hr.obrt.fiskal.ui.components.FiskalCard
+import hr.obrt.fiskal.ui.components.FiskalChip
+import hr.obrt.fiskal.ui.components.FiskalEmptyState
+import hr.obrt.fiskal.ui.components.LightHeader
+import hr.obrt.fiskal.ui.theme.FiskalSpacing
+import hr.obrt.fiskal.ui.theme.LocalFiskalTokens
 import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Date
 import java.util.Locale
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ReportsScreen(vm: AppViewModel, onBack: () -> Unit) {
+    val t = LocalFiskalTokens.current
     val ctx = LocalContext.current
     var period by remember { mutableStateOf(PeriodIzvjestaja.DANAS) }
     var prilagodjenoOd by remember { mutableStateOf(pocetakDanasnjegDana()) }
@@ -35,19 +49,18 @@ fun ReportsScreen(vm: AppViewModel, onBack: () -> Unit) {
     val izvjestaj = remember(period, vm.selected.value, prilagodjenoOd, prilagodjenoDo) {
         vm.izvjestaj(period, prilagodjenoOd, prilagodjenoDo)
     }
+    val maxPromet = maxOf(
+        izvjestaj.poNacinuPlac.maxOfOrNull { it.ukupno.abs() } ?: java.math.BigDecimal.ONE,
+        java.math.BigDecimal.ONE,
+    )
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("Izvještaji") },
-                navigationIcon = { TextButton(onClick = onBack, colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.onPrimary)) { Text("Natrag") } },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.primary, titleContentColor = MaterialTheme.colorScheme.onPrimary),
-            )
-        }
-    ) { pad ->
+    Column(Modifier.fillMaxSize().background(t.bg)) {
+        LightHeader("Izvještaji", vm.selected.value?.opis())
+
         LazyColumn(
-            Modifier.padding(pad).fillMaxSize().padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(14.dp),
+            Modifier.padding(horizontal = FiskalSpacing.screenX),
+            verticalArrangement = Arrangement.spacedBy(FiskalSpacing.stackGap),
+            contentPadding = PaddingValues(bottom = FiskalSpacing.listPad),
         ) {
             item {
                 Row(
@@ -55,7 +68,7 @@ fun ReportsScreen(vm: AppViewModel, onBack: () -> Unit) {
                     horizontalArrangement = Arrangement.spacedBy(6.dp),
                 ) {
                     PeriodIzvjestaja.entries.forEach { p ->
-                        FilterChip(selected = period == p, onClick = { period = p }, label = { Text(p.naziv) })
+                        FiskalChip(p.naziv, period == p) { period = p }
                     }
                 }
             }
@@ -74,15 +87,19 @@ fun ReportsScreen(vm: AppViewModel, onBack: () -> Unit) {
             }
 
             item {
-                Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer, contentColor = MaterialTheme.colorScheme.onPrimaryContainer)) {
-                    Row(Modifier.padding(16.dp).fillMaxWidth()) {
+                Card(
+                    Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(20.dp),
+                    colors = CardDefaults.cardColors(containerColor = t.heroHeader),
+                ) {
+                    Row(Modifier.padding(FiskalSpacing.card).fillMaxWidth()) {
                         Column(Modifier.weight(1f)) {
-                            Text("Broj računa", style = MaterialTheme.typography.labelMedium)
-                            Text("${izvjestaj.brojRacuna}", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+                            Text("Broj računa", style = MaterialTheme.typography.labelMedium, color = t.oliveInk.copy(alpha = 0.8f))
+                            Text("${izvjestaj.brojRacuna}", style = MaterialTheme.typography.headlineSmall, color = t.oliveInk)
                         }
                         Column(Modifier.weight(1f)) {
-                            Text("Ukupan promet", style = MaterialTheme.typography.labelMedium)
-                            Text("${izvjestaj.ukupanPromet.toPlainString()} €", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+                            Text("Ukupan promet", style = MaterialTheme.typography.labelMedium, color = t.oliveInk.copy(alpha = 0.8f))
+                            Text(hrEur(izvjestaj.ukupanPromet), style = MaterialTheme.typography.headlineSmall, color = t.oliveInk)
                         }
                     }
                 }
@@ -91,7 +108,7 @@ fun ReportsScreen(vm: AppViewModel, onBack: () -> Unit) {
             item { NaslovSekcije("Po načinima plaćanja") }
             if (izvjestaj.poNacinuPlac.isEmpty()) item { PrazniRedak() }
             items(izvjestaj.poNacinuPlac) { s ->
-                IzvjestajRedak(s.nacin.opis, "${s.brojRacuna} rač. · ${s.ukupno.toPlainString()} €")
+                NacinPlacRedak(s.nacin.opis, "${s.brojRacuna} rač. · ${hrEur(s.ukupno)}", s.ukupno.abs(), maxPromet)
             }
 
             item { NaslovSekcije("Rekapitulacija PDV-a") }
@@ -106,10 +123,8 @@ fun ReportsScreen(vm: AppViewModel, onBack: () -> Unit) {
             item { NaslovSekcije("Prodaja po artiklima") }
             if (izvjestaj.poArtiklima.isEmpty()) item { PrazniRedak() }
             items(izvjestaj.poArtiklima) { a ->
-                IzvjestajRedak(a.naziv, "kol. ${a.kolicina.toPlainString()} · ${a.ukupno.toPlainString()} €")
+                IzvjestajRedak(a.naziv, "kol. ${a.kolicina.toPlainString()} · ${hrEur(a.ukupno)}")
             }
-
-            item { Spacer(Modifier.height(12.dp)) }
         }
     }
 }
@@ -145,20 +160,44 @@ private fun odaberiDatumVrijeme(ctx: Context, pocetno: Long, onOdabrano: (Long) 
 
 @Composable
 private fun NaslovSekcije(naslov: String) {
-    Text(naslov, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+    val t = LocalFiskalTokens.current
+    Text(naslov, style = MaterialTheme.typography.titleSmall, color = t.ink)
 }
 
 @Composable
 private fun PrazniRedak() {
-    Text("Nema podataka za odabrani period.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    FiskalEmptyState(
+        Icons.Rounded.Assessment,
+        "Nema podataka",
+        "Još nema računa za ovaj period. Novi račun kreiraš gumbom + u donjoj navigaciji.",
+    )
 }
 
 @Composable
 private fun IzvjestajRedak(naziv: String, vrijednost: String) {
-    ElevatedCard {
+    val t = LocalFiskalTokens.current
+    FiskalCard(Modifier.fillMaxWidth()) {
         Row(Modifier.padding(12.dp).fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-            Text(naziv, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
-            Text(vrijednost, style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Medium)
+            Text(naziv, style = MaterialTheme.typography.bodyMedium, color = t.ink, modifier = Modifier.weight(1f))
+            Text(vrijednost, style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Medium, color = t.muted)
+        }
+    }
+}
+
+/** Redak po načinu plaćanja s horizontalnom trakom proporcionalnom iznosu. BRAND-UPUTE 9.6. */
+@Composable
+private fun NacinPlacRedak(naziv: String, vrijednost: String, iznos: java.math.BigDecimal, max: java.math.BigDecimal) {
+    val t = LocalFiskalTokens.current
+    val udio = (iznos.toFloat() / max.toFloat()).coerceIn(0f, 1f)
+    FiskalCard(Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(12.dp).fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(naziv, style = MaterialTheme.typography.bodyMedium, color = t.ink, modifier = Modifier.weight(1f))
+                Text(vrijednost, style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Medium, color = t.muted)
+            }
+            Box(Modifier.fillMaxWidth().height(6.dp).background(t.surfaceSunken, RoundedCornerShape(3.dp))) {
+                Box(Modifier.fillMaxWidth(udio).height(6.dp).background(t.olive, RoundedCornerShape(3.dp)))
+            }
         }
     }
 }

@@ -251,6 +251,36 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     fun ukloniStavku(index: Int) { stavke.removeAt(index) }
 
+    /**
+     * Brzi tap-dodaj s grida artikala (Novi račun): ako stavka za ovaj artikl već
+     * postoji (isti naziv/cijena/PDV, bez ručnog popusta) samo joj poveća količinu za
+     * 1, inače doda novu stavku s količinom 1 — bez otvaranja dijaloga.
+     */
+    fun dodajIliPovecajStavku(a: Artikl) {
+        val cijena = fmt(a.jedCijena)
+        val stopa = fmt(a.pdvStopa)
+        val idx = stavke.indexOfFirst {
+            it.naziv == a.naziv && it.jedCijena == cijena && it.pdvStopa == stopa && it.popust == "0"
+        }
+        if (idx >= 0) povecajKolicinu(idx) else stavke.add(
+            preracunajBazu(StavkaInput(naziv = a.naziv, kolicina = "1", jedMjere = a.jedMjere, jedCijena = cijena, pdvStopa = stopa))
+        )
+    }
+
+    /** Poveća količinu stavke za 1 (stepper na retku stavke). */
+    fun povecajKolicinu(index: Int) {
+        val s = stavke[index]
+        val nova = parse(s.kolicina).add(BigDecimal.ONE)
+        stavke[index] = preracunajBazu(s.copy(kolicina = nova.stripTrailingZeros().toPlainString()))
+    }
+
+    /** Smanji količinu stavke za 1 (stepper na retku stavke); ukloni stavku ako padne na 0 ili manje. */
+    fun smanjiKolicinu(index: Int) {
+        val s = stavke[index]
+        val nova = parse(s.kolicina).subtract(BigDecimal.ONE)
+        if (nova.signum() <= 0) ukloniStavku(index) else stavke[index] = preracunajBazu(s.copy(kolicina = nova.stripTrailingZeros().toPlainString()))
+    }
+
     /** Otvara dijalog za dodavanje nove stavke iz odabranog artikla. */
     fun zapocniDodavanjeIzArtikla(a: Artikl) {
         uredjivanjeIndex.value = null

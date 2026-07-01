@@ -1,13 +1,20 @@
 package hr.obrt.fiskal.ui
 
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ContentCopy
-import androidx.compose.material3.*
+import androidx.compose.material.icons.rounded.ContentCopy
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -19,6 +26,7 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewModelScope
 import hr.obrt.fiskal.fiskal.BluetoothPrinter
@@ -27,6 +35,13 @@ import hr.obrt.fiskal.fiskal.FiskalFormat
 import hr.obrt.fiskal.fiskal.InvoiceShare
 import hr.obrt.fiskal.fiskal.QrRenderer
 import hr.obrt.fiskal.fiskal.ReceiptPrinter
+import hr.obrt.fiskal.ui.components.FiskalCard
+import hr.obrt.fiskal.ui.components.FiskalOutlineButton
+import hr.obrt.fiskal.ui.components.FiskalPrimaryButton
+import hr.obrt.fiskal.ui.components.LightHeader
+import hr.obrt.fiskal.ui.components.StatusBadge
+import hr.obrt.fiskal.ui.theme.FiskalSpacing
+import hr.obrt.fiskal.ui.theme.LocalFiskalTokens
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -34,78 +49,101 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun InvoiceDetailScreen(vm: AppViewModel, onBack: () -> Unit, onCopy: () -> Unit, onStorno: () -> Unit) {
+    val t = LocalFiskalTokens.current
     val si = vm.detail.value ?: return
     val ctx = LocalContext.current
     val data = remember(si) { vm.receiptFromSaved(si) }
     val qr = remember(si) { QrRenderer.toBitmap(si.qrUrl, 600).asImageBitmap() }
-    val datum = remember { SimpleDateFormat("dd.MM.yyyy HH:mm:ss", Locale.ROOT).format(Date(si.createdAt)) }
+    val datum = remember(si) { SimpleDateFormat("dd.MM.yyyy HH:mm:ss", Locale.ROOT).format(Date(si.createdAt)) }
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("Račun ${si.brojRacuna()}") },
-                navigationIcon = { TextButton(onClick = onBack, colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.onPrimary)) { Text("Natrag") } },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.primary, titleContentColor = MaterialTheme.colorScheme.onPrimary),
-            )
-        }
-    ) { pad ->
+    Column(Modifier.fillMaxSize().background(t.bg)) {
+        LightHeader("Račun ${si.brojRacuna()}", si.naslovTvrtke, onBack = onBack)
+
         LazyColumn(
-            Modifier.padding(pad).padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp),
+            Modifier.padding(horizontal = FiskalSpacing.screenX),
+            verticalArrangement = Arrangement.spacedBy(FiskalSpacing.stackGap),
+            contentPadding = PaddingValues(bottom = FiskalSpacing.listPad),
         ) {
-            item { Text(si.naslovTvrtke, style = MaterialTheme.typography.titleMedium) }
-            item { Text("Datum: $datum", style = MaterialTheme.typography.bodySmall) }
-            if (si.kupac.isNotBlank() || si.kupacOib.isNotBlank()) item {
-                Column {
-                    Text(
-                        "Kupac: ${si.kupac}" + (if (si.kupacOib.isNotBlank()) " (OIB ${si.kupacOib})" else ""),
-                        style = MaterialTheme.typography.bodyMedium,
-                    )
-                    if (si.kupacAdresa.isNotBlank()) Text(si.kupacAdresa, style = MaterialTheme.typography.bodySmall)
-                }
-            }
-            item { Divider() }
-            items(si.racun.stavke) { s ->
-                Column {
-                    Row {
-                        Text(s.naziv, Modifier.weight(1f))
-                        Text("${FiskalFormat.amount(s.ukupno)} €")
-                    }
-                    if (si.racun.zaglavlje.uSustavuPdv) {
-                        Text(
-                            "neto ${FiskalFormat.amount(s.neto)} · PDV ${FiskalFormat.amount(s.pdvStopa)}% = ${FiskalFormat.amount(s.pdvIznos)}",
-                            style = MaterialTheme.typography.bodySmall,
-                        )
-                    }
-                }
-            }
             item {
-                Divider()
-                Text("UKUPNO: ${FiskalFormat.amount(si.racun.iznosUkupno)} €", style = MaterialTheme.typography.titleLarge)
-                Text("Plaćanje: ${si.racun.nacinPlac.opis}", style = MaterialTheme.typography.bodySmall)
-                if (si.napomena.isNotBlank()) Text("Napomena: ${si.napomena}", style = MaterialTheme.typography.bodySmall)
+                FiskalCard(Modifier.fillMaxWidth()) {
+                    Column(Modifier.padding(FiskalSpacing.card), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text("Datum: $datum", style = MaterialTheme.typography.bodySmall, color = t.muted, modifier = Modifier.weight(1f))
+                            StatusBadge(si.jir != null)
+                        }
+                        if (si.kupac.isNotBlank() || si.kupacOib.isNotBlank()) {
+                            Text(
+                                "Kupac: ${si.kupac}" + (if (si.kupacOib.isNotBlank()) " (OIB ${si.kupacOib})" else ""),
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = t.ink,
+                            )
+                            if (si.kupacAdresa.isNotBlank()) Text(si.kupacAdresa, style = MaterialTheme.typography.bodySmall, color = t.muted)
+                        }
+                    }
+                }
             }
-            item { PoljeKopija("JIR", si.jir ?: "— (${si.status})", ctx) }
-            item { PoljeKopija("ZKI", si.zki, ctx) }
+
+            item {
+                FiskalCard(Modifier.fillMaxWidth()) {
+                    Column(Modifier.padding(FiskalSpacing.card)) {
+                        si.racun.stavke.forEachIndexed { index, s ->
+                            Column(Modifier.padding(vertical = 4.dp)) {
+                                Row {
+                                    Text(s.naziv, Modifier.weight(1f), color = t.ink)
+                                    Text(hrEur(s.ukupno), color = t.ink)
+                                }
+                                if (si.racun.zaglavlje.uSustavuPdv) {
+                                    Text(
+                                        "neto ${FiskalFormat.amount(s.neto)} · PDV ${FiskalFormat.amount(s.pdvStopa)}% = ${FiskalFormat.amount(s.pdvIznos)}",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = t.muted,
+                                    )
+                                }
+                            }
+                            if (index < si.racun.stavke.lastIndex) androidx.compose.material3.Divider(color = t.border)
+                        }
+                        androidx.compose.material3.Divider(color = t.border, modifier = Modifier.padding(vertical = 8.dp))
+                        Text("UKUPNO: ${hrEur(si.racun.iznosUkupno)}", style = MaterialTheme.typography.titleLarge, color = t.ink)
+                        Text("Plaćanje: ${si.racun.nacinPlac.opis}", style = MaterialTheme.typography.bodySmall, color = t.muted)
+                        if (si.napomena.isNotBlank()) Text("Napomena: ${si.napomena}", style = MaterialTheme.typography.bodySmall, color = t.muted)
+                    }
+                }
+            }
+
+            item {
+                FiskalCard(Modifier.fillMaxWidth()) {
+                    Column(Modifier.padding(FiskalSpacing.card), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        PoljeKopija("JIR", si.jir ?: "— (${si.status})", ctx)
+                        PoljeKopija("ZKI", si.zki, ctx)
+                    }
+                }
+            }
+
             if (si.jir == null) item {
                 Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     Text(
                         "Račun nije fiskaliziran (nema JIR-a).",
                         style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.error,
+                        color = t.error,
                     )
-                    Button(
+                    FiskalPrimaryButton(
+                        if (vm.ucitavanje.value) "Šaljem…" else "Pokušaj ponovno (fiskaliziraj)",
                         onClick = { vm.ponoviFiskalizaciju(si) },
                         enabled = !vm.ucitavanje.value,
                         modifier = Modifier.fillMaxWidth(),
-                    ) { Text(if (vm.ucitavanje.value) "Šaljem…" else "Pokušaj ponovno (fiskaliziraj)") }
-                    vm.greska.value?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall) }
+                    )
+                    vm.greska.value?.let { Text(it, color = t.error, style = MaterialTheme.typography.bodySmall) }
                 }
             }
-            item { Image(bitmap = qr, contentDescription = "QR", modifier = Modifier.size(200.dp)) }
+
+            item {
+                Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+                    Image(bitmap = qr, contentDescription = "QR", modifier = Modifier.size(200.dp))
+                }
+            }
+
             item {
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     Button(onClick = { ReceiptPrinter.print(ctx, data) }, modifier = Modifier.weight(1f)) { Text("Ispiši / PDF") }
@@ -137,34 +175,29 @@ fun InvoiceDetailScreen(vm: AppViewModel, onBack: () -> Unit, onCopy: () -> Unit
                         modifier = Modifier.weight(1f),
                     ) { Text(if (isprint) "Šaljem…" else "POS pisač") }
                 }
-                printPoruka?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
+                printPoruka?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = t.muted) }
             }
             item {
                 val uriHandler = LocalUriHandler.current
-                OutlinedButton(
+                FiskalOutlineButton(
+                    "Provjeri na Poreznoj",
                     onClick = { runCatching { uriHandler.openUri(si.qrUrl) } },
                     modifier = Modifier.fillMaxWidth(),
-                ) { Text("Provjeri na Poreznoj") }
+                )
             }
             item {
-                FilledTonalButton(onClick = onCopy, modifier = Modifier.fillMaxWidth()) {
-                    Text("Kopiraj u novi račun")
-                }
+                FiskalOutlineButton("Kopiraj u novi račun", onClick = onCopy, modifier = Modifier.fillMaxWidth())
             }
             if (si.jir != null) item {
-                OutlinedButton(
-                    onClick = onStorno,
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error),
-                ) { Text("Storniraj račun") }
+                FiskalOutlineButton("Storniraj račun", onClick = onStorno, destruktivno = true, modifier = Modifier.fillMaxWidth())
             }
             item {
-                OutlinedButton(
+                FiskalOutlineButton(
+                    "Obriši iz povijesti",
                     onClick = { vm.obrisiIzPovijesti(si); onBack() },
+                    destruktivno = true,
                     modifier = Modifier.fillMaxWidth(),
-                    colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error),
-                ) { Text("Obriši iz povijesti") }
-                Spacer(Modifier.height(24.dp))
+                )
             }
         }
     }
@@ -172,13 +205,14 @@ fun InvoiceDetailScreen(vm: AppViewModel, onBack: () -> Unit, onCopy: () -> Unit
 
 @Composable
 private fun PoljeKopija(naziv: String, vrijednost: String, ctx: android.content.Context) {
+    val t = LocalFiskalTokens.current
     Row(verticalAlignment = Alignment.CenterVertically) {
         Column(Modifier.weight(1f)) {
-            Text(naziv, style = MaterialTheme.typography.labelLarge)
-            SelectionContainer { Text(vrijednost, fontFamily = FontFamily.Monospace) }
+            Text(naziv, style = MaterialTheme.typography.labelMedium, color = t.muted)
+            SelectionContainer { Text(vrijednost, fontFamily = FontFamily.Monospace, color = t.ink) }
         }
         IconButton(onClick = { InvoiceShare.copyToClipboard(ctx, naziv, vrijednost) }) {
-            Icon(Icons.Filled.ContentCopy, "Kopiraj $naziv")
+            Icon(Icons.Rounded.ContentCopy, "Kopiraj $naziv", tint = t.mutedSoft)
         }
     }
 }
