@@ -36,7 +36,7 @@ import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun InvoiceDetailScreen(vm: AppViewModel, onBack: () -> Unit, onCopy: () -> Unit) {
+fun InvoiceDetailScreen(vm: AppViewModel, onBack: () -> Unit, onCopy: () -> Unit, onStorno: () -> Unit) {
     val si = vm.detail.value ?: return
     val ctx = LocalContext.current
     val data = remember(si) { vm.receiptFromSaved(si) }
@@ -150,6 +150,13 @@ fun InvoiceDetailScreen(vm: AppViewModel, onBack: () -> Unit, onCopy: () -> Unit
                 FilledTonalButton(onClick = onCopy, modifier = Modifier.fillMaxWidth()) {
                     Text("Kopiraj u novi račun")
                 }
+            }
+            if (si.jir != null) item {
+                OutlinedButton(
+                    onClick = onStorno,
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error),
+                ) { Text("Storniraj račun") }
             }
             item {
                 OutlinedButton(

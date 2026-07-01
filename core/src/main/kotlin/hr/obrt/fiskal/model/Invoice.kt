@@ -7,7 +7,6 @@ import java.math.RoundingMode
 enum class NacinPlac(val oznaka: String, val opis: String) {
     G("G", "Gotovina"),
     K("K", "Kartica"),
-    C("C", "Ček"),
     T("T", "Transakcijski račun"),
     O("O", "Ostalo");
 

@@ -108,9 +108,10 @@ fun InvoiceScreen(
 
     if (potvrdaFiskal) {
         val produkcija = tvrtka?.okolina == hr.obrt.fiskal.fiskal.FiskalOkolina.PRODUKCIJA
+        val jeStorno = vm.ukupno() < java.math.BigDecimal.ZERO
         AlertDialog(
             onDismissRequest = { potvrdaFiskal = false },
-            title = { Text(if (vm.storno.value) "Kreirati STORNO račun?" else "Kreirati račun?") },
+            title = { Text(if (jeStorno) "Kreirati STORNO račun?" else "Kreirati račun?") },
             text = {
                 Column {
                     Text("Stavki: ${vm.stavke.size} · Ukupno: ${vm.ukupno().toPlainString()} €")
@@ -162,10 +163,12 @@ private fun InvoiceForm(
             )
         }
 
+        item { KupacNapomena(vm, prikaziKupca, onPickPartner) { prikaziKupca = it } }
+
         if (vm.stavke.isEmpty()) {
             item {
                 Text(
-                    "Nema stavki. Dodaj prvu stavku iz šifrarnika.",
+                    "Nema stavki.",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -176,11 +179,9 @@ private fun InvoiceForm(
 
         item {
             FilledTonalButton(onClick = onPickArticle, modifier = Modifier.fillMaxWidth()) {
-                Icon(Icons.Filled.Add, null, Modifier.size(18.dp)); Spacer(Modifier.width(4.dp)); Text("Dodaj stavku iz šifrarnika")
+                Icon(Icons.Filled.Add, null, Modifier.size(18.dp)); Spacer(Modifier.width(4.dp)); Text("Dodaj novu stavku računa")
             }
         }
-
-        item { KupacNapomena(vm, prikaziKupca, onPickPartner) { prikaziKupca = it } }
 
         item {
             Text("Način plaćanja", style = MaterialTheme.typography.labelLarge)
@@ -197,11 +198,7 @@ private fun InvoiceForm(
         }
 
         item {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Switch(checked = vm.storno.value, onCheckedChange = { vm.storno.value = it })
-                Spacer(Modifier.width(8.dp))
-                Text("Storno (iznosi u minus)")
-            }
+            Polje(vm.popustRacuna.value, "Popust na račun (%)", Modifier.fillMaxWidth()) { vm.setPopustRacuna(it) }
         }
 
         item { SazetakKartica(vm, pdv) }
@@ -222,7 +219,8 @@ private fun StavkaRedak(vm: AppViewModel, index: Int, pdv: Boolean) {
                 Text(s.naziv, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
                 Text(
                     "${s.kolicina} ${s.jedMjere} × ${s.jedCijena.ifBlank { "0.00" }} €" +
-                        (if (pdv) " · PDV ${s.pdvStopa}%" else ""),
+                        (if (pdv) " · PDV ${s.pdvStopa}%" else "") +
+                        (s.popust.toBigDecimalOrNull()?.let { if (it.signum() != 0) " · popust ${s.popust}%" else "" } ?: ""),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -260,6 +258,7 @@ private fun StavkaUnosDijalog(vm: AppViewModel, pdv: Boolean) {
                     Polje(u.kolicina, "Količina", Modifier.weight(1f)) { vm.setUnosKolicina(it) }
                     Polje(u.jedCijena, if (pdv) "Cijena (neto)" else "Cijena", Modifier.weight(1f)) { vm.setUnosCijena(it) }
                 }
+                Polje(u.popust, "Popust (%)", Modifier.fillMaxWidth()) { vm.setUnosPopust(it) }
                 Divider()
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text("Ukupno stavke", style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
@@ -278,11 +277,24 @@ private fun StavkaUnosDijalog(vm: AppViewModel, pdv: Boolean) {
 
 @Composable
 private fun KupacNapomena(vm: AppViewModel, prosiren: Boolean, onPickPartner: () -> Unit, naProsiri: (Boolean) -> Unit) {
+    val imaKupca = vm.kupacNaziv.value.isNotBlank()
     ElevatedCard {
         Column(Modifier.padding(12.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
-                Text("Kupac i napomena (nije obavezno)", style = MaterialTheme.typography.titleSmall, modifier = Modifier.weight(1f))
-                TextButton(onClick = { naProsiri(!prosiren) }) { Text(if (prosiren) "Sakrij" else "Dodaj") }
+                Column(Modifier.weight(1f)) {
+                    Text("Kupac", style = MaterialTheme.typography.titleSmall)
+                    if (imaKupca) Text(
+                        vm.kupacNaziv.value,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.primary,
+                        fontWeight = FontWeight.SemiBold,
+                    ) else Text(
+                        "Nije obavezno",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                TextButton(onClick = { naProsiri(!prosiren) }) { Text(if (prosiren) "Sakrij" else if (imaKupca) "Uredi" else "Dodaj") }
             }
             if (prosiren) {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(top = 4.dp)) {
@@ -307,7 +319,7 @@ private fun KupacNapomena(vm: AppViewModel, prosiren: Boolean, onPickPartner: ()
 
 @Composable
 private fun SazetakKartica(vm: AppViewModel, pdv: Boolean) {
-    val crveno = vm.storno.value
+    val crveno = vm.ukupno() < java.math.BigDecimal.ZERO
     Card(
         colors = CardDefaults.cardColors(
             containerColor = if (crveno) MaterialTheme.colorScheme.errorContainer

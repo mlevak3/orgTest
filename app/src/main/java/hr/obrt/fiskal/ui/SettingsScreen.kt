@@ -193,12 +193,18 @@ fun SettingsScreen(vm: AppViewModel, onClose: () -> Unit) {
 
     fun spremi() {
         store.postaviLozinku(company.id, lozinka)
+        // Sljedeći brojevi računa (po prostoru/uređaju) mijenjaju se isključivo kroz
+        // fiskalizaciju, ne kroz ovaj ekran — uvijek preuzmi najsvježije spremljene
+        // vrijednosti kako spremanje ovdje (npr. samo naziva ili printera) ne bi
+        // slučajno vratilo brojač unatrag na zastarjelu vrijednost uhvaćenu pri
+        // otvaranju ekrana.
+        val spremljenaTvrtka = store.sve().firstOrNull { it.id == company.id }
         val azurirana = company.copy(
             naziv = naziv, oib = oib, uSustavuPdv = pdv, oibOper = oper,
             okolina = okolina, ignoreTls = ignoreTls,
             printerAddress = printerAddress,
             zadanaPdvStopa = zadanaPdvStopa, zadaniNacinPlac = zadaniNacinPlac, zadanaJedMjere = zadanaJedMjere,
-            djelatnosti = djelatnosti,
+            djelatnosti = spojiSljedeceBrojeve(djelatnosti, spremljenaTvrtka?.djelatnosti),
             zadanaDjelatnostId = zadanaDjelatnostId,
         )
         vm.saveCompany(azurirana)
@@ -611,6 +617,26 @@ private fun dubokaKopija(list: List<Djelatnost>): MutableList<Djelatnost> = list
         p.copy(naplatniUredjaji = p.naplatniUredjaji.map { it.copy() }.toMutableList())
     }.toMutableList())
 }.toMutableList()
+
+/** Preuzima sljedeciBroj (po prostoru/uređaju) iz trenutno spremljenog stanja u uređenu listu. */
+private fun spojiSljedeceBrojeve(uredjene: List<Djelatnost>, spremljene: List<Djelatnost>?): MutableList<Djelatnost> {
+    if (spremljene == null) return uredjene.toMutableList()
+    return uredjene.map { d ->
+        val spD = spremljene.firstOrNull { it.id == d.id }
+        if (spD == null) d else d.copy(
+            poslovniProstori = d.poslovniProstori.map { p ->
+                val spP = spD.poslovniProstori.firstOrNull { it.id == p.id }
+                if (spP == null) p else p.copy(
+                    sljedeciBroj = spP.sljedeciBroj,
+                    naplatniUredjaji = p.naplatniUredjaji.map { u ->
+                        val spU = spP.naplatniUredjaji.firstOrNull { it.id == u.id }
+                        if (spU == null) u else u.copy(sljedeciBroj = spU.sljedeciBroj)
+                    }.toMutableList(),
+                )
+            }.toMutableList(),
+        )
+    }.toMutableList()
+}
 
 private fun certStatus(postoji: Boolean) =
     if (postoji) "Status: certifikat učitan." else "Status: certifikat NIJE učitan."

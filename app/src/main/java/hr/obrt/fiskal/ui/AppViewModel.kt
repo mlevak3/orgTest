@@ -47,6 +47,8 @@ data class StavkaInput(
     var jedMjere: String = "kom",
     var jedCijena: String = "",
     var pdvStopa: String = "25",
+    /** Popust na stavku, u postotku (0 = bez popusta). */
+    var popust: String = "0",
     var neto: String = "",
     var pdvIznos: String = "",
     var ukupno: String = "",
@@ -63,13 +65,15 @@ data class StavkaUnos(
     val pdvStopa: String,
     var kolicina: String = "1",
     var jedCijena: String = "",
+    /** Popust na stavku, u postotku (0 = bez popusta). */
+    var popust: String = "0",
 )
 
 /** Period za koji se generira izvještaj. */
 enum class PeriodIzvjestaja(val naziv: String) {
-    DANAS("Danas"), TJEDAN("7 dana"), MJESEC("Ovaj mjesec"), SVE("Sve vrijeme");
+    DANAS("Danas"), TJEDAN("7 dana"), MJESEC("Mjesec"), SVE("Sve"), PRILAGODJENO("Prilagođeno");
 
-    /** Početak perioda (epoch millis), ili null za "Sve vrijeme". */
+    /** Početak perioda (epoch millis), ili null za "Sve"/"Prilagođeno" (potonji ima vlastite granice). */
     fun pocetak(): Long? = when (this) {
         DANAS -> Calendar.getInstance().apply {
             set(Calendar.HOUR_OF_DAY, 0); set(Calendar.MINUTE, 0); set(Calendar.SECOND, 0); set(Calendar.MILLISECOND, 0)
@@ -78,7 +82,7 @@ enum class PeriodIzvjestaja(val naziv: String) {
         MJESEC -> Calendar.getInstance().apply {
             set(Calendar.DAY_OF_MONTH, 1); set(Calendar.HOUR_OF_DAY, 0); set(Calendar.MINUTE, 0); set(Calendar.SECOND, 0); set(Calendar.MILLISECOND, 0)
         }.timeInMillis
-        SVE -> null
+        SVE, PRILAGODJENO -> null
     }
 }
 
@@ -119,8 +123,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     /** Indeks stavke koja se uređuje (null = dodaje se nova). */
     val uredjivanjeIndex = mutableStateOf<Int?>(null)
     val nacinPlac = mutableStateOf(NacinPlac.G)
-    /** Storno — svi iznosi računa idu u minus. */
-    val storno = mutableStateOf(false)
+    /** Popust na razini cijelog računa, u postotku (0 = bez popusta). */
+    val popustRacuna = mutableStateOf("0")
     val kupacNaziv = mutableStateOf("")
     val kupacOib = mutableStateOf("")
     val kupacAdresa = mutableStateOf("")
@@ -193,11 +197,23 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     fun setBrojRacuna(v: String) { brojRacuna.value = v.filter(Char::isDigit) }
 
+    /**
+     * Predloženi broj računa uvijek se čita izravno iz spremljenog stanja (a ne
+     * iz eventualno zastarjelih referenci u memoriji — npr. nakon što je
+     * "Postavke tvrtke" spremljeno preko starije kopije), kako broj uvijek
+     * odgovara stvarnom sljedećem broju prema postavkama slijednosti.
+     */
     private fun azurirajPredlozeniBroj() {
+        val t = selected.value ?: return
         val d = selectedDjelatnost.value ?: return
         val p = selectedProstor.value ?: return
         val u = selectedUredjaj.value ?: return
-        brojRacuna.value = (if (d.oznSlijed == OznSlijed.P) p.sljedeciBroj else u.sljedeciBroj).toString()
+        val svjezaTvrtka = companyStore.sve().firstOrNull { it.id == t.id } ?: t
+        val svjezaDjelatnost = svjezaTvrtka.djelatnosti.firstOrNull { it.id == d.id } ?: d
+        val svjeziProstor = svjezaDjelatnost.poslovniProstori.firstOrNull { it.id == p.id } ?: p
+        val svjeziUredjaj = svjeziProstor.naplatniUredjaji.firstOrNull { it.id == u.id } ?: u
+        brojRacuna.value =
+            (if (svjezaDjelatnost.oznSlijed == OznSlijed.P) svjeziProstor.sljedeciBroj else svjeziUredjaj.sljedeciBroj).toString()
     }
 
     /** Nakon uspješne fiskalizacije: ponovno učita tvrtku i postavi selekciju na osvježene objekte. */
@@ -244,10 +260,11 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             pdvStopa = fmt(a.pdvStopa),
             kolicina = "1",
             jedCijena = fmt(a.jedCijena),
+            popust = "0",
         )
     }
 
-    /** Otvara dijalog za uređivanje već potvrđene stavke (količina/cijena). */
+    /** Otvara dijalog za uređivanje već potvrđene stavke (količina/cijena/popust). */
     fun zapocniUredjivanjeStavke(index: Int) {
         val s = stavke[index]
         uredjivanjeIndex.value = index
@@ -257,6 +274,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             pdvStopa = s.pdvStopa,
             kolicina = s.kolicina,
             jedCijena = s.jedCijena,
+            popust = s.popust,
         )
     }
 
@@ -267,12 +285,13 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     fun setUnosKolicina(v: String) { stavkaUnos.value = stavkaUnos.value?.copy(kolicina = v) }
     fun setUnosCijena(v: String) { stavkaUnos.value = stavkaUnos.value?.copy(jedCijena = v) }
+    fun setUnosPopust(v: String) { stavkaUnos.value = stavkaUnos.value?.copy(popust = v) }
 
     /** Pregled ukupnog iznosa za stavku koja se trenutno unosi/uređuje (za prikaz u dijalogu). */
     fun izracunUnosa(): BigDecimal? {
         val u = stavkaUnos.value ?: return null
         return preracunajBazu(
-            StavkaInput(naziv = u.naziv, kolicina = u.kolicina, jedMjere = u.jedMjere, jedCijena = u.jedCijena, pdvStopa = u.pdvStopa)
+            StavkaInput(naziv = u.naziv, kolicina = u.kolicina, jedMjere = u.jedMjere, jedCijena = u.jedCijena, pdvStopa = u.pdvStopa, popust = u.popust)
         ).ukupno.let { parse(it) }
     }
 
@@ -280,16 +299,18 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     fun potvrdiUnosStavke() {
         val u = stavkaUnos.value ?: return
         val novo = preracunajBazu(
-            StavkaInput(naziv = u.naziv, kolicina = u.kolicina, jedMjere = u.jedMjere, jedCijena = u.jedCijena, pdvStopa = u.pdvStopa)
+            StavkaInput(naziv = u.naziv, kolicina = u.kolicina, jedMjere = u.jedMjere, jedCijena = u.jedCijena, pdvStopa = u.pdvStopa, popust = u.popust)
         )
         val idx = uredjivanjeIndex.value
         if (idx != null) stavke[idx] = novo else stavke.add(novo)
         otkaziUnosStavke()
     }
 
-    /** Iz količine i jedinične cijene izračuna neto, pa PDV i ukupno. */
+    /** Iz količine, jedinične cijene i popusta na stavci izračuna neto, pa PDV i ukupno. */
     private fun preracunajBazu(s: StavkaInput): StavkaInput {
-        val neto = parse(s.kolicina).multiply(parse(s.jedCijena)).setScale(2, RoundingMode.HALF_UP)
+        val bazniNeto = parse(s.kolicina).multiply(parse(s.jedCijena))
+        val faktorPopusta = BigDecimal.ONE.subtract(parse(s.popust).divide(BigDecimal(100)))
+        val neto = bazniNeto.multiply(faktorPopusta).setScale(2, RoundingMode.HALF_UP)
         return if (uSustavuPdv()) {
             val pdv = neto.multiply(parse(s.pdvStopa)).divide(BigDecimal(100)).setScale(2, RoundingMode.HALF_UP)
             s.copy(neto = fmt(neto), pdvIznos = fmt(pdv), ukupno = fmt(neto.add(pdv)))
@@ -298,15 +319,19 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    fun setPopustRacuna(v: String) { popustRacuna.value = v }
+
+    /** Faktor popusta na razini računa (1 = bez popusta, 0.9 = 10% popusta). */
+    private fun popustRacunaFaktor(): BigDecimal = BigDecimal.ONE.subtract(parse(popustRacuna.value).divide(BigDecimal(100)))
+
     fun ukupno(): BigDecimal = zbroj { it.ukupno }
     fun zbrojNeto(): BigDecimal = zbroj { it.neto }
     fun zbrojPdv(): BigDecimal = zbroj { it.pdvIznos }
 
-    private inline fun zbroj(selector: (StavkaInput) -> String): BigDecimal {
-        val base = stavke.fold(BigDecimal.ZERO) { acc, s -> acc.add(parse(selector(s))) }
+    private inline fun zbroj(selector: (StavkaInput) -> String): BigDecimal =
+        stavke.fold(BigDecimal.ZERO) { acc, s -> acc.add(parse(selector(s))) }
+            .multiply(popustRacunaFaktor())
             .setScale(2, RoundingMode.HALF_UP)
-        return if (storno.value) base.negate() else base
-    }
 
     /** Ima li obrazac nespremljenog unosa (za potvrdu izlaza). */
     fun imaUnos(): Boolean =
@@ -369,7 +394,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             brOznRac = broj,
             datVrijeme = Date(),
             stavke = stavke.map {
-                fun iznos(x: String) = parse(x).let { v -> if (storno.value) v.negate() else v }
+                val faktor = popustRacunaFaktor()
+                fun iznos(x: String) = parse(x).multiply(faktor).setScale(2, RoundingMode.HALF_UP)
                 Stavka(
                     naziv = it.naziv,
                     kolicina = parse(it.kolicina),
@@ -427,7 +453,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         if (selectedDjelatnost.value == null || selectedProstor.value == null || selectedUredjaj.value == null)
             return "Odaberi djelatnost, poslovni prostor i naplatni uređaj."
         if (brojRacuna.value.toLongOrNull() == null) return "Broj računa mora biti cijeli broj."
-        if (stavke.isEmpty()) return "Dodaj barem jednu stavku iz šifrarnika."
+        if (stavke.isEmpty()) return "Dodaj barem jednu stavku računa."
         return null
     }
 
@@ -437,7 +463,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         stavkaUnos.value = null
         uredjivanjeIndex.value = null
         nacinPlac.value = t?.zadaniNacinPlac ?: NacinPlac.G
-        storno.value = false
+        popustRacuna.value = "0"
         kupacNaziv.value = ""
         kupacOib.value = ""
         kupacAdresa.value = ""
@@ -505,11 +531,21 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     /** Učita stavke i podatke postojećeg računa u novi obrazac (za ponovno izdavanje/ispravak). */
-    fun kopirajURacun(si: SavedInvoice) {
+    fun kopirajURacun(si: SavedInvoice) = ucitajURacun(si, negiraj = false)
+
+    /**
+     * Kopira postojeći račun u novi obrazac, ali s negativnim iznosima (storno) —
+     * za brzo stornirianje već fiskaliziranog računa.
+     */
+    fun stornirajRacun(si: SavedInvoice) = ucitajURacun(si, negiraj = true)
+
+    private fun ucitajURacun(si: SavedInvoice, negiraj: Boolean) {
         stavke.clear()
         si.racun.stavke.forEach { s ->
-            val neto = s.neto.abs()
-            val jed = if (s.kolicina.signum() != 0) neto.divide(s.kolicina, 2, RoundingMode.HALF_UP) else neto
+            val predznak = if (negiraj) -1 else 1
+            val neto = s.neto.abs().multiply(BigDecimal(predznak))
+            val jed = (if (s.kolicina.signum() != 0) s.neto.abs().divide(s.kolicina, 2, RoundingMode.HALF_UP) else s.neto.abs())
+                .multiply(BigDecimal(predznak))
             stavke.add(
                 StavkaInput(
                     naziv = s.naziv,
@@ -518,8 +554,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                     jedCijena = fmt(jed),
                     pdvStopa = fmt(s.pdvStopa),
                     neto = fmt(neto),
-                    pdvIznos = fmt(s.pdvIznos.abs()),
-                    ukupno = fmt(s.ukupno.abs()),
+                    pdvIznos = fmt(s.pdvIznos.abs().multiply(BigDecimal(predznak))),
+                    ukupno = fmt(s.ukupno.abs().multiply(BigDecimal(predznak))),
                 )
             )
         }
@@ -527,7 +563,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         kupacOib.value = si.kupacOib
         kupacAdresa.value = si.kupacAdresa
         napomena.value = si.napomena
-        storno.value = false
+        popustRacuna.value = "0"
         nacinPlac.value = si.racun.nacinPlac
         ishod.value = null
         greska.value = null
@@ -541,14 +577,14 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         history.addAll(invoiceStore.zaTvrtku(t.id))
     }
 
-    /** Broj fiskaliziranih računa i promet za danas (odabrana tvrtka). Za prikaz na početnoj. */
+    /** Broj računa i promet za danas (odabrana tvrtka, svi računi — fiskalizirani i nefiskalizirani). Za prikaz na početnoj. */
     fun statistikaDanas(): Pair<Int, BigDecimal> {
         val t = selected.value ?: return 0 to BigDecimal.ZERO
         val danas = java.util.Calendar.getInstance().apply {
             set(java.util.Calendar.HOUR_OF_DAY, 0); set(java.util.Calendar.MINUTE, 0)
             set(java.util.Calendar.SECOND, 0); set(java.util.Calendar.MILLISECOND, 0)
         }.timeInMillis
-        val danasnji = invoiceStore.zaTvrtku(t.id).filter { it.jir != null && it.createdAt >= danas }
+        val danasnji = invoiceStore.zaTvrtku(t.id).filter { it.createdAt >= danas }
         val promet = danasnji.fold(BigDecimal.ZERO) { acc, si -> acc.add(si.racun.iznosUkupno) }
             .setScale(2, RoundingMode.HALF_UP)
         return danasnji.size to promet
@@ -565,12 +601,23 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     // --- Izvještaji ---
 
-    /** Izračuna izvještaj za odabranu tvrtku i period (samo fiskalizirani računi). */
-    fun izvjestaj(period: PeriodIzvjestaja): Izvjestaj {
+    /**
+     * Izračuna izvještaj za odabranu tvrtku i period (samo fiskalizirani računi).
+     * Za [PeriodIzvjestaja.PRILAGODJENO] koriste se [prilagodjenoOd]/[prilagodjenoDo]
+     * (epoch millis, uključivo — dopuštaju odabir do razine minute).
+     */
+    fun izvjestaj(period: PeriodIzvjestaja, prilagodjenoOd: Long? = null, prilagodjenoDo: Long? = null): Izvjestaj {
         val t = selected.value ?: return Izvjestaj(0, BigDecimal.ZERO, emptyList(), emptyList(), emptyList())
         val svi = invoiceStore.zaTvrtku(t.id).filter { it.jir != null }
-        val od = period.pocetak()
-        val filtrirano = if (od == null) svi else svi.filter { it.createdAt >= od }
+        val filtrirano = if (period == PeriodIzvjestaja.PRILAGODJENO) {
+            svi.filter { si ->
+                (prilagodjenoOd == null || si.createdAt >= prilagodjenoOd) &&
+                    (prilagodjenoDo == null || si.createdAt <= prilagodjenoDo)
+            }
+        } else {
+            val od = period.pocetak()
+            if (od == null) svi else svi.filter { it.createdAt >= od }
+        }
 
         val brojRacuna = filtrirano.size
         val ukupanPromet = filtrirano.zbrojRacuna { it.racun.iznosUkupno }

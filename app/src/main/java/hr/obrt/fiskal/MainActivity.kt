@@ -145,6 +145,7 @@ class MainActivity : ComponentActivity() {
                         vm,
                         onBack = { vm.closeDetail(); screen = Screen.History },
                         onCopy = { vm.detail.value?.let { vm.kopirajURacun(it) }; screen = Screen.Invoice },
+                        onStorno = { vm.detail.value?.let { vm.stornirajRacun(it) }; screen = Screen.Invoice },
                     )
                 }
             }
