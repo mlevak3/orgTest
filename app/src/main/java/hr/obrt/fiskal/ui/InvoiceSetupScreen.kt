@@ -1,3 +1,5 @@
+@file:OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
+
 package hr.obrt.fiskal.ui
 
 import androidx.compose.foundation.background

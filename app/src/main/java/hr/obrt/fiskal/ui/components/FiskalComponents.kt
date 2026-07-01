@@ -152,7 +152,7 @@ fun MiniBadge(text: String, modifier: Modifier = Modifier) {
 
 /** Chip/segment — aktivan maslina pill, neaktivan surface+border. BRAND-UPUTE 8.3. */
 @Composable
-fun FiskalChip(label: String, selected: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier) {
+fun FiskalChip(label: String, selected: Boolean, modifier: Modifier = Modifier, onClick: () -> Unit) {
     val t = LocalFiskalTokens.current
     Box(
         modifier
