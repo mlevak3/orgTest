@@ -59,10 +59,13 @@ fun InvoiceDetailScreen(vm: AppViewModel, onBack: () -> Unit, onCopy: () -> Unit
             item { Text(si.naslovTvrtke, style = MaterialTheme.typography.titleMedium) }
             item { Text("Datum: $datum", style = MaterialTheme.typography.bodySmall) }
             if (si.kupac.isNotBlank() || si.kupacOib.isNotBlank()) item {
-                Text(
-                    "Kupac: ${si.kupac}" + (if (si.kupacOib.isNotBlank()) " (OIB ${si.kupacOib})" else ""),
-                    style = MaterialTheme.typography.bodyMedium,
-                )
+                Column {
+                    Text(
+                        "Kupac: ${si.kupac}" + (if (si.kupacOib.isNotBlank()) " (OIB ${si.kupacOib})" else ""),
+                        style = MaterialTheme.typography.bodyMedium,
+                    )
+                    if (si.kupacAdresa.isNotBlank()) Text(si.kupacAdresa, style = MaterialTheme.typography.bodySmall)
+                }
             }
             item { Divider() }
             items(si.racun.stavke) { s ->

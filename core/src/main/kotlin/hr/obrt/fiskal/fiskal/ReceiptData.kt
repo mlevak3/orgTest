@@ -11,6 +11,7 @@ data class ReceiptData(
     val qrUrl: String,
     val kupac: String = "",
     val kupacOib: String = "",
+    val kupacAdresa: String = "",
     val napomena: String = "",
     /** Logo tvrtke (PNG bajtovi), za ispis/PDF/email — opcionalno. */
     val logoPng: ByteArray? = null,

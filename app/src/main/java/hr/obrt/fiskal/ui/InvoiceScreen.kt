@@ -44,6 +44,8 @@ fun InvoiceScreen(
     onSettings: () -> Unit,
     onArticles: () -> Unit,
     onPickArticle: () -> Unit,
+    onPartners: () -> Unit,
+    onPickPartner: () -> Unit,
 ) {
     val ishod = vm.ishod.value
     val tvrtka = vm.selected.value
@@ -73,6 +75,7 @@ fun InvoiceScreen(
                     IconButton(onClick = { meniOtvoren = true }) { Icon(Icons.Filled.MoreVert, "Izbornik") }
                     DropdownMenu(expanded = meniOtvoren, onDismissRequest = { meniOtvoren = false }) {
                         DropdownMenuItem(text = { Text("Šifrarnik artikala") }, onClick = { meniOtvoren = false; onArticles() })
+                        DropdownMenuItem(text = { Text("Šifrarnik partnera") }, onClick = { meniOtvoren = false; onPartners() })
                         DropdownMenuItem(text = { Text("Postavke tvrtke") }, onClick = { meniOtvoren = false; onSettings() })
                     }
                 },
@@ -87,7 +90,7 @@ fun InvoiceScreen(
         },
     ) { pad ->
         if (ishod != null) ResultView(vm, Modifier.padding(pad))
-        else InvoiceForm(vm, tvrtka, Modifier.padding(pad), onPickArticle)
+        else InvoiceForm(vm, tvrtka, Modifier.padding(pad), onPickArticle, onPickPartner)
     }
 
     if (potvrdaIzlaza) AlertDialog(
@@ -122,7 +125,13 @@ fun InvoiceScreen(
 }
 
 @Composable
-private fun InvoiceForm(vm: AppViewModel, tvrtka: hr.obrt.fiskal.data.Tvrtka?, modifier: Modifier, onPickArticle: () -> Unit) {
+private fun InvoiceForm(
+    vm: AppViewModel,
+    tvrtka: hr.obrt.fiskal.data.Tvrtka?,
+    modifier: Modifier,
+    onPickArticle: () -> Unit,
+    onPickPartner: () -> Unit,
+) {
     val pdv = tvrtka?.uSustavuPdv == true
     var prikaziKupca by remember { mutableStateOf(false) }
 
@@ -159,7 +168,7 @@ private fun InvoiceForm(vm: AppViewModel, tvrtka: hr.obrt.fiskal.data.Tvrtka?, m
             }
         }
 
-        item { KupacNapomena(vm, prikaziKupca) { prikaziKupca = it } }
+        item { KupacNapomena(vm, prikaziKupca, onPickPartner) { prikaziKupca = it } }
 
         item {
             Text("Način plaćanja", style = MaterialTheme.typography.labelLarge)
@@ -239,7 +248,7 @@ private fun StavkaKartica(vm: AppViewModel, index: Int, pdv: Boolean) {
 }
 
 @Composable
-private fun KupacNapomena(vm: AppViewModel, prosiren: Boolean, naProsiri: (Boolean) -> Unit) {
+private fun KupacNapomena(vm: AppViewModel, prosiren: Boolean, onPickPartner: () -> Unit, naProsiri: (Boolean) -> Unit) {
     ElevatedCard {
         Column(Modifier.padding(12.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
@@ -248,12 +257,18 @@ private fun KupacNapomena(vm: AppViewModel, prosiren: Boolean, naProsiri: (Boole
             }
             if (prosiren) {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(top = 4.dp)) {
+                    Text(
+                        "Krajnji kupac (upiši ručno) ili odaberi predefiniranog partnera:",
+                        style = MaterialTheme.typography.bodySmall,
+                    )
+                    OutlinedButton(onClick = onPickPartner, modifier = Modifier.fillMaxWidth()) { Text("Odaberi partnera") }
                     OutlinedTextField(vm.kupacNaziv.value, { vm.kupacNaziv.value = it }, label = { Text("Naziv kupca") }, singleLine = true, modifier = Modifier.fillMaxWidth())
                     OutlinedTextField(
                         vm.kupacOib.value, { vm.kupacOib.value = it.filter(Char::isDigit).take(11) },
                         label = { Text("OIB kupca") }, singleLine = true,
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), modifier = Modifier.fillMaxWidth(),
                     )
+                    OutlinedTextField(vm.kupacAdresa.value, { vm.kupacAdresa.value = it }, label = { Text("Adresa kupca") }, singleLine = true, modifier = Modifier.fillMaxWidth())
                     OutlinedTextField(vm.napomena.value, { vm.napomena.value = it }, label = { Text("Napomena") }, modifier = Modifier.fillMaxWidth())
                 }
             }

@@ -93,7 +93,8 @@ object ReceiptPrinter {
 
         val kupacBlok = if (data.kupac.isNotBlank() || data.kupacOib.isNotBlank())
             "<div><b>Kupac:</b> ${esc(data.kupac)}" +
-                (if (data.kupacOib.isNotBlank()) " (OIB ${esc(data.kupacOib)})" else "") + "</div>"
+                (if (data.kupacOib.isNotBlank()) " (OIB ${esc(data.kupacOib)})" else "") + "</div>" +
+                (if (data.kupacAdresa.isNotBlank()) "<div>${esc(data.kupacAdresa)}</div>" else "")
         else ""
         val napomenaBlok = if (data.napomena.isNotBlank())
             "<div class='note'><b>Napomena:</b> ${esc(data.napomena)}</div>" else ""

@@ -19,12 +19,13 @@ import hr.obrt.fiskal.ui.HomeScreen
 import hr.obrt.fiskal.ui.InvoiceDetailScreen
 import hr.obrt.fiskal.ui.InvoiceScreen
 import hr.obrt.fiskal.ui.InvoiceSetupScreen
+import hr.obrt.fiskal.ui.PartnersScreen
 import hr.obrt.fiskal.ui.SettingsScreen
 import hr.obrt.fiskal.ui.theme.FiskalTheme
 import hr.obrt.fiskal.data.AppPreferences
 
 private enum class Screen {
-    CompanyList, Home, Settings, ActivityPicker, InvoiceSetup, Invoice, History, Detail, Articles, Backup
+    CompanyList, Home, Settings, ActivityPicker, InvoiceSetup, Invoice, History, Detail, Articles, Partners, Backup
 }
 
 class MainActivity : ComponentActivity() {
@@ -101,6 +102,8 @@ class MainActivity : ComponentActivity() {
                         onSettings = { vm.selected.value?.let { vm.editCompany(it) }; screen = Screen.Settings },
                         onArticles = { vm.biranjeArtikla.value = false; vm.loadArticles(); screen = Screen.Articles },
                         onPickArticle = { vm.biranjeArtikla.value = true; vm.loadArticles(); screen = Screen.Articles },
+                        onPartners = { vm.biranjePartnera.value = false; vm.loadPartners(); screen = Screen.Partners },
+                        onPickPartner = { vm.biranjePartnera.value = true; vm.loadPartners(); screen = Screen.Partners },
                     )
 
                     Screen.Articles -> ArticlesScreen(
@@ -111,6 +114,18 @@ class MainActivity : ComponentActivity() {
                         onBack = {
                             val pick = vm.biranjeArtikla.value
                             vm.biranjeArtikla.value = false
+                            screen = if (pick) Screen.Invoice else Screen.Home
+                        },
+                    )
+
+                    Screen.Partners -> PartnersScreen(
+                        vm,
+                        onPick = if (vm.biranjePartnera.value) {
+                            { p -> vm.odaberiPartnera(p); vm.biranjePartnera.value = false; screen = Screen.Invoice }
+                        } else null,
+                        onBack = {
+                            val pick = vm.biranjePartnera.value
+                            vm.biranjePartnera.value = false
                             screen = if (pick) Screen.Invoice else Screen.Home
                         },
                     )

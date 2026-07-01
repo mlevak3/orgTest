@@ -11,6 +11,8 @@ import hr.obrt.fiskal.data.CompanyStore
 import hr.obrt.fiskal.data.Djelatnost
 import hr.obrt.fiskal.data.InvoiceStore
 import hr.obrt.fiskal.data.NaplatniUredaj
+import hr.obrt.fiskal.data.Partner
+import hr.obrt.fiskal.data.PartnerStore
 import hr.obrt.fiskal.data.PoslovniProstor
 import hr.obrt.fiskal.data.SavedInvoice
 import hr.obrt.fiskal.data.Tvrtka
@@ -55,6 +57,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     val companyStore = CompanyStore(app)
     private val invoiceStore = InvoiceStore(app)
     private val articleStore = ArticleStore(app)
+    private val partnerStore = PartnerStore(app)
 
     // --- Tvrtke ---
     val companies = mutableStateListOf<Tvrtka>()
@@ -74,12 +77,18 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     val storno = mutableStateOf(false)
     val kupacNaziv = mutableStateOf("")
     val kupacOib = mutableStateOf("")
+    val kupacAdresa = mutableStateOf("")
     val napomena = mutableStateOf("")
 
     // --- Šifrarnik artikala ---
     val articles = mutableStateListOf<Artikl>()
     val editingArticle = mutableStateOf<Artikl?>(null)
     val biranjeArtikla = mutableStateOf(false)
+
+    // --- Šifrarnik partnera ---
+    val partners = mutableStateListOf<Partner>()
+    val editingPartner = mutableStateOf<Partner?>(null)
+    val biranjePartnera = mutableStateOf(false)
 
     // --- Izvršavanje / rezultat ---
     val ucitavanje = mutableStateOf(false)
@@ -330,6 +339,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 createdAt = System.currentTimeMillis(),
                 kupac = kupacNaziv.value,
                 kupacOib = kupacOib.value,
+                kupacAdresa = kupacAdresa.value,
                 napomena = napomena.value,
             )
         )
@@ -356,6 +366,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         storno.value = false
         kupacNaziv.value = ""
         kupacOib.value = ""
+        kupacAdresa.value = ""
         napomena.value = ""
         ishod.value = null
         greska.value = null
@@ -399,6 +410,35 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         if (idx >= 0) stavke[idx] = novo else stavke.add(novo)
     }
 
+    // --- Šifrarnik partnera ---
+    fun loadPartners() {
+        val t = selected.value ?: return
+        partners.clear()
+        partners.addAll(partnerStore.zaTvrtku(t.id))
+    }
+
+    fun newPartner() { editingPartner.value = Partner() }
+    fun editPartner(p: Partner) { editingPartner.value = p }
+
+    fun savePartner(p: Partner) {
+        selected.value?.let { partnerStore.spremi(it.id, p) }
+        loadPartners()
+        editingPartner.value = null
+    }
+
+    fun deletePartner(p: Partner) {
+        selected.value?.let { partnerStore.obrisi(it.id, p.id) }
+        loadPartners()
+        editingPartner.value = null
+    }
+
+    /** Popuni kupca podacima partnera (i dalje ručno promjenjivo — nije zaključano). */
+    fun odaberiPartnera(p: Partner) {
+        kupacNaziv.value = p.naziv
+        kupacOib.value = p.oib
+        kupacAdresa.value = p.adresa
+    }
+
     /** Učita stavke i podatke postojećeg računa u novi obrazac (za ponovno izdavanje/ispravak). */
     fun kopirajURacun(si: SavedInvoice) {
         stavke.clear()
@@ -421,6 +461,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         if (stavke.isEmpty()) stavke.add(StavkaInput())
         kupacNaziv.value = si.kupac
         kupacOib.value = si.kupacOib
+        kupacAdresa.value = si.kupacAdresa
         napomena.value = si.napomena
         storno.value = false
         nacinPlac.value = si.racun.nacinPlac
@@ -470,7 +511,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         return ReceiptData(
             naslovTvrtke = t?.opis() ?: "",
             racun = i.racun, jir = i.jir, zki = i.zki, qrUrl = i.qrUrl,
-            kupac = kupacNaziv.value, kupacOib = kupacOib.value, napomena = napomena.value,
+            kupac = kupacNaziv.value, kupacOib = kupacOib.value, kupacAdresa = kupacAdresa.value, napomena = napomena.value,
             logoPng = t?.let { companyStore.logoBytes(it.id) },
         )
     }
@@ -483,6 +524,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         qrUrl = si.qrUrl,
         kupac = si.kupac,
         kupacOib = si.kupacOib,
+        kupacAdresa = si.kupacAdresa,
         napomena = si.napomena,
         logoPng = companyStore.logoBytes(si.companyId),
     )

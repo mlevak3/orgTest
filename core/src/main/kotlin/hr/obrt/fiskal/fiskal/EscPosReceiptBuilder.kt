@@ -46,6 +46,7 @@ object EscPosReceiptBuilder {
         ln("Djelatnik: ${z.oibOper}")
         if (data.kupac.isNotBlank() || data.kupacOib.isNotBlank()) {
             ln("Kupac: ${data.kupac}" + if (data.kupacOib.isNotBlank()) " (OIB ${data.kupacOib})" else "")
+            if (data.kupacAdresa.isNotBlank()) ln(data.kupacAdresa)
         }
         ln("=".repeat(WIDTH))
 

@@ -24,6 +24,7 @@ data class SavedInvoice(
     val createdAt: Long,
     val kupac: String = "",
     val kupacOib: String = "",
+    val kupacAdresa: String = "",
     val napomena: String = "",
 ) {
     fun brojRacuna(): String =
@@ -40,6 +41,7 @@ data class SavedInvoice(
         put("createdAt", createdAt)
         put("kupac", kupac)
         put("kupacOib", kupacOib)
+        put("kupacAdresa", kupacAdresa)
         put("napomena", napomena)
         val z = racun.zaglavlje
         put("oib", z.oib)
@@ -110,6 +112,7 @@ data class SavedInvoice(
                 createdAt = o.optLong("createdAt", System.currentTimeMillis()),
                 kupac = o.optString("kupac"),
                 kupacOib = o.optString("kupacOib"),
+                kupacAdresa = o.optString("kupacAdresa"),
                 napomena = o.optString("napomena"),
             )
         }
