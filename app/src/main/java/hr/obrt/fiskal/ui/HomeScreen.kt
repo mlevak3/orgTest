@@ -9,6 +9,7 @@ import androidx.compose.material.icons.filled.Brightness6
 import androidx.compose.material.icons.filled.Brightness7
 import androidx.compose.material.icons.filled.Business
 import androidx.compose.material.icons.filled.CloudUpload
+import androidx.compose.material.icons.filled.Groups
 import androidx.compose.material.icons.filled.List
 import androidx.compose.material.icons.filled.Print
 import androidx.compose.material.icons.filled.Settings
@@ -41,6 +42,7 @@ fun HomeScreen(
     onNewInvoice: () -> Unit,
     onHistory: () -> Unit,
     onArticles: () -> Unit,
+    onPartners: () -> Unit,
     onSettings: () -> Unit,
     onCompanies: () -> Unit,
     onBackup: () -> Unit,
@@ -145,15 +147,16 @@ fun HomeScreen(
                 }
             }
 
-            // Brze radnje — mreža 2x2
+            // Brze radnje — mreža
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 MenuPlocica("Računi", Icons.Filled.List, cs.secondaryContainer, cs.onSecondaryContainer, Modifier.weight(1f), onHistory)
                 MenuPlocica("Šifrarnik", Icons.Filled.ShoppingCart, cs.tertiaryContainer, cs.onTertiaryContainer, Modifier.weight(1f), onArticles)
             }
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                MenuPlocica("Partneri", Icons.Filled.Groups, cs.tertiaryContainer, cs.onTertiaryContainer, Modifier.weight(1f), onPartners)
                 MenuPlocica("Postavke", Icons.Filled.Settings, cs.surfaceVariant, cs.onSurfaceVariant, Modifier.weight(1f), onSettings)
-                MenuPlocica("Sig. kopija", Icons.Filled.CloudUpload, cs.surfaceVariant, cs.onSurfaceVariant, Modifier.weight(1f), onBackup)
             }
+            MenuPlocica("Sigurnosna kopija", Icons.Filled.CloudUpload, cs.surfaceVariant, cs.onSurfaceVariant, Modifier.fillMaxWidth(), onBackup)
         }
     }
 }

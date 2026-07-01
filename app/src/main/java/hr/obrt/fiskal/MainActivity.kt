@@ -69,6 +69,7 @@ class MainActivity : ComponentActivity() {
                         },
                         onHistory = { vm.loadHistory(); screen = Screen.History },
                         onArticles = { vm.biranjeArtikla.value = false; vm.loadArticles(); screen = Screen.Articles },
+                        onPartners = { vm.biranjePartnera.value = false; vm.loadPartners(); screen = Screen.Partners },
                         onSettings = { vm.selected.value?.let { vm.editCompany(it) }; screen = Screen.Settings },
                         onCompanies = { screen = Screen.CompanyList },
                         onBackup = { screen = Screen.Backup },
@@ -109,7 +110,7 @@ class MainActivity : ComponentActivity() {
                     Screen.Articles -> ArticlesScreen(
                         vm,
                         onPick = if (vm.biranjeArtikla.value) {
-                            { a -> vm.dodajIzArtikla(a); vm.biranjeArtikla.value = false; screen = Screen.Invoice }
+                            { a -> vm.zapocniDodavanjeIzArtikla(a); vm.biranjeArtikla.value = false; screen = Screen.Invoice }
                         } else null,
                         onBack = {
                             val pick = vm.biranjeArtikla.value

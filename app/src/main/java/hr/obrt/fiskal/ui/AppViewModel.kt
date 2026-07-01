@@ -36,10 +36,9 @@ import java.util.Date
 import java.util.UUID
 
 /**
- * Stavka u obrascu (tekstualni unos).
- * [jedCijena] je jedinična cijena bez PDV-a (za PDV obveznika) odnosno cijena
- * (za neobveznika). [neto], [pdvIznos] i [ukupno] su izračunati, ali ih korisnik
- * može ručno korigirati (zaokruživanje).
+ * Potvrđena stavka računa (uvijek nastaje iz artikla u šifrarniku — nema
+ * slobodnog unosa). [neto]/[pdvIznos]/[ukupno] su izvedeni iz količine i
+ * jedinične cijene u trenutku potvrde.
  */
 data class StavkaInput(
     var naziv: String = "",
@@ -50,6 +49,19 @@ data class StavkaInput(
     var neto: String = "",
     var pdvIznos: String = "",
     var ukupno: String = "",
+)
+
+/**
+ * Stavka u tijeku unosa (dijalog za dodavanje/uređivanje) — nastaje odabirom
+ * artikla iz šifrarnika. Naziv, jedinica mjere i PDV stopa su zaključani
+ * (dolaze iz artikla); mijenjati se mogu samo količina i cijena.
+ */
+data class StavkaUnos(
+    val naziv: String,
+    val jedMjere: String,
+    val pdvStopa: String,
+    var kolicina: String = "1",
+    var jedCijena: String = "",
 )
 
 class AppViewModel(app: Application) : AndroidViewModel(app) {
@@ -71,7 +83,11 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     val brojRacuna = mutableStateOf("1")
 
     // --- Stanje računa ---
-    val stavke = mutableStateListOf(StavkaInput())
+    val stavke = mutableStateListOf<StavkaInput>()
+    /** Ne-null dok je otvoren dijalog za dodavanje/uređivanje stavke. */
+    val stavkaUnos = mutableStateOf<StavkaUnos?>(null)
+    /** Indeks stavke koja se uređuje (null = dodaje se nova). */
+    val uredjivanjeIndex = mutableStateOf<Int?>(null)
     val nacinPlac = mutableStateOf(NacinPlac.G)
     /** Storno — svi iznosi računa idu u minus. */
     val storno = mutableStateOf(false)
@@ -182,29 +198,64 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         refreshCompanies()
     }
 
-    // --- Stavke ---
-    fun dodajStavku() = stavke.add(
-        StavkaInput(
-            pdvStopa = selected.value?.zadanaPdvStopa ?: "25",
-            jedMjere = selected.value?.zadanaJedMjere ?: "kom",
-        )
-    )
-    fun ukloniStavku(index: Int) { if (stavke.size > 1) stavke.removeAt(index) }
+    // --- Stavke (uvijek iz šifrarnika artikala; dodaju se/uređuju jedna po jedna) ---
 
     private fun uSustavuPdv(): Boolean = selected.value?.uSustavuPdv == true
     private fun fmt(b: BigDecimal): String = b.setScale(2, RoundingMode.HALF_UP).toPlainString()
 
-    fun setNaziv(i: Int, v: String) { stavke[i] = stavke[i].copy(naziv = v) }
-    fun setKolicina(i: Int, v: String) { stavke[i] = preracunajBazu(stavke[i].copy(kolicina = v)) }
-    fun setJedMjere(i: Int, v: String) { stavke[i] = stavke[i].copy(jedMjere = v) }
-    fun setJedCijena(i: Int, v: String) { stavke[i] = preracunajBazu(stavke[i].copy(jedCijena = v)) }
-    fun setStopa(i: Int, v: String) { stavke[i] = preracunajOdNeto(stavke[i].copy(pdvStopa = v)) }
-    fun setNeto(i: Int, v: String) { stavke[i] = preracunajOdNeto(stavke[i].copy(neto = v)) }
-    fun setPdvIznos(i: Int, v: String) {
-        val s = stavke[i].copy(pdvIznos = v)
-        stavke[i] = s.copy(ukupno = fmt(parse(s.neto).add(parse(s.pdvIznos))))
+    fun ukloniStavku(index: Int) { stavke.removeAt(index) }
+
+    /** Otvara dijalog za dodavanje nove stavke iz odabranog artikla. */
+    fun zapocniDodavanjeIzArtikla(a: Artikl) {
+        uredjivanjeIndex.value = null
+        stavkaUnos.value = StavkaUnos(
+            naziv = a.naziv,
+            jedMjere = a.jedMjere,
+            pdvStopa = fmt(a.pdvStopa),
+            kolicina = "1",
+            jedCijena = fmt(a.jedCijena),
+        )
     }
-    fun setUkupno(i: Int, v: String) { stavke[i] = stavke[i].copy(ukupno = v) }
+
+    /** Otvara dijalog za uređivanje već potvrđene stavke (količina/cijena). */
+    fun zapocniUredjivanjeStavke(index: Int) {
+        val s = stavke[index]
+        uredjivanjeIndex.value = index
+        stavkaUnos.value = StavkaUnos(
+            naziv = s.naziv,
+            jedMjere = s.jedMjere,
+            pdvStopa = s.pdvStopa,
+            kolicina = s.kolicina,
+            jedCijena = s.jedCijena,
+        )
+    }
+
+    fun otkaziUnosStavke() {
+        stavkaUnos.value = null
+        uredjivanjeIndex.value = null
+    }
+
+    fun setUnosKolicina(v: String) { stavkaUnos.value = stavkaUnos.value?.copy(kolicina = v) }
+    fun setUnosCijena(v: String) { stavkaUnos.value = stavkaUnos.value?.copy(jedCijena = v) }
+
+    /** Pregled ukupnog iznosa za stavku koja se trenutno unosi/uređuje (za prikaz u dijalogu). */
+    fun izracunUnosa(): BigDecimal? {
+        val u = stavkaUnos.value ?: return null
+        return preracunajBazu(
+            StavkaInput(naziv = u.naziv, kolicina = u.kolicina, jedMjere = u.jedMjere, jedCijena = u.jedCijena, pdvStopa = u.pdvStopa)
+        ).ukupno.let { parse(it) }
+    }
+
+    /** Potvrđuje unos (dodaje novu stavku ili sprema izmjenu postojeće). */
+    fun potvrdiUnosStavke() {
+        val u = stavkaUnos.value ?: return
+        val novo = preracunajBazu(
+            StavkaInput(naziv = u.naziv, kolicina = u.kolicina, jedMjere = u.jedMjere, jedCijena = u.jedCijena, pdvStopa = u.pdvStopa)
+        )
+        val idx = uredjivanjeIndex.value
+        if (idx != null) stavke[idx] = novo else stavke.add(novo)
+        otkaziUnosStavke()
+    }
 
     /** Iz količine i jedinične cijene izračuna neto, pa PDV i ukupno. */
     private fun preracunajBazu(s: StavkaInput): StavkaInput {
@@ -215,13 +266,6 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         } else {
             s.copy(neto = fmt(neto), pdvIznos = "0.00", ukupno = fmt(neto))
         }
-    }
-
-    /** Iz neta i stope izračuna PDV i ukupno (neto je zadan). */
-    private fun preracunajOdNeto(s: StavkaInput): StavkaInput {
-        val neto = parse(s.neto)
-        val pdv = neto.multiply(parse(s.pdvStopa)).divide(BigDecimal(100)).setScale(2, RoundingMode.HALF_UP)
-        return s.copy(pdvIznos = fmt(pdv), ukupno = fmt(neto.add(pdv)))
     }
 
     fun ukupno(): BigDecimal = zbroj { it.ukupno }
@@ -236,7 +280,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     /** Ima li obrazac nespremljenog unosa (za potvrdu izlaza). */
     fun imaUnos(): Boolean =
-        stavke.any { it.naziv.isNotBlank() || parse(it.ukupno).signum() != 0 } ||
+        stavke.isNotEmpty() || stavkaUnos.value != null ||
             kupacNaziv.value.isNotBlank() || kupacOib.value.isNotBlank() || napomena.value.isNotBlank()
 
     fun fiskaliziraj() {
@@ -353,15 +397,15 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         if (selectedDjelatnost.value == null || selectedProstor.value == null || selectedUredjaj.value == null)
             return "Odaberi djelatnost, poslovni prostor i naplatni uređaj."
         if (brojRacuna.value.toLongOrNull() == null) return "Broj računa mora biti cijeli broj."
-        if (stavke.none { it.naziv.isNotBlank() && parse(it.ukupno).signum() != 0 })
-            return "Dodaj barem jednu stavku s iznosom (≠ 0)."
+        if (stavke.isEmpty()) return "Dodaj barem jednu stavku iz šifrarnika."
         return null
     }
 
     fun resetRacun() {
         val t = selected.value
         stavke.clear()
-        stavke.add(StavkaInput(pdvStopa = t?.zadanaPdvStopa ?: "25", jedMjere = t?.zadanaJedMjere ?: "kom"))
+        stavkaUnos.value = null
+        uredjivanjeIndex.value = null
         nacinPlac.value = t?.zadaniNacinPlac ?: NacinPlac.G
         storno.value = false
         kupacNaziv.value = ""
@@ -399,15 +443,6 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         selected.value?.let { articleStore.obrisi(it.id, a.id) }
         loadArticles()
         editingArticle.value = null
-    }
-
-    /** Dodaje stavku iz artikla (zamijeni prazan red ili dodaj novi). */
-    fun dodajIzArtikla(a: Artikl) {
-        val novo = preracunajBazu(
-            StavkaInput(naziv = a.naziv, kolicina = "1", jedMjere = a.jedMjere, jedCijena = fmt(a.jedCijena), pdvStopa = fmt(a.pdvStopa))
-        )
-        val idx = stavke.indexOfFirst { it.naziv.isBlank() && parse(it.ukupno).signum() == 0 }
-        if (idx >= 0) stavke[idx] = novo else stavke.add(novo)
     }
 
     // --- Šifrarnik partnera ---
@@ -458,7 +493,6 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 )
             )
         }
-        if (stavke.isEmpty()) stavke.add(StavkaInput())
         kupacNaziv.value = si.kupac
         kupacOib.value = si.kupacOib
         kupacAdresa.value = si.kupacAdresa
@@ -502,6 +536,52 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     fun obrisiIzPovijesti(si: SavedInvoice) {
         invoiceStore.obrisi(si)
         loadHistory()
+    }
+
+    /**
+     * Ponovni pokušaj fiskalizacije već spremljenog (nefiskaliziranog) računa —
+     * "naknadna dostava". Šalje se ISTI račun (isti broj, iznos, stavke → isti
+     * ZKI kao na već otisnutom računu), samo označen NakDost=true.
+     */
+    fun ponoviFiskalizaciju(si: SavedInvoice) {
+        if (si.jir != null) return
+        greska.value = null
+        ucitavanje.value = true
+        viewModelScope.launch {
+            val rezultat = withContext(Dispatchers.IO) { ponoviIzvrsi(si) }
+            ucitavanje.value = false
+            rezultat.fold(
+                onSuccess = { azurirani -> detail.value = azurirani; loadHistory() },
+                onFailure = { greska.value = it.message ?: "Nepoznata greška." },
+            )
+        }
+    }
+
+    private fun ponoviIzvrsi(si: SavedInvoice): Result<SavedInvoice> = runCatching {
+        val t = companies.firstOrNull { it.id == si.companyId }
+            ?: throw IllegalStateException("Tvrtka nije pronađena.")
+        val bytes = companyStore.certBytes(t.id)
+            ?: throw IllegalStateException("Certifikat nije učitan (Postavke tvrtke).")
+        val cert = try {
+            FiskalCertificate.load(bytes.inputStream(), companyStore.lozinka(t.id).toCharArray())
+        } catch (e: Exception) {
+            throw IllegalStateException("Ne mogu otvoriti certifikat — provjeri lozinku certifikata u Postavkama. (${e.message})")
+        }
+        val caCerts = CaStore.loadExtraCas(getApplication(), companyStore.caBytes(t.id))
+        val service = FiskalService(cert, t.okolina, t.ignoreTls, caCerts)
+
+        val racunZaSlanje = si.racun.copy(nakDost = true)
+        val ishod = service.fiskaliziraj(racunZaSlanje)
+
+        val status = when (val r = ishod.rezultat) {
+            is FiskalRezultat.Uspjeh -> "Fiskaliziran"
+            is FiskalRezultat.Greska -> "CIS greška: ${r.sifra} ${r.poruka}"
+            is FiskalRezultat.Neizvjesno -> "NEIZVJESNO — provjeri (možda fiskalizirano)"
+            is FiskalRezultat.Mreza -> "Nije poslano: ${r.poruka}"
+        }
+        val azurirani = si.copy(racun = racunZaSlanje, jir = ishod.jir, zki = ishod.zki, qrUrl = ishod.qrUrl, status = status)
+        invoiceStore.spremi(azurirani)
+        azurirani
     }
 
     // --- Ispis / email ---

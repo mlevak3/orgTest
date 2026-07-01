@@ -88,13 +88,15 @@ fun InvoiceScreen(
             if (ishod == null) ExtendedFloatingActionButton(
                 onClick = { if (!vm.ucitavanje.value) potvrdaFiskal = true },
                 icon = { if (vm.ucitavanje.value) CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp) },
-                text = { Text(if (vm.ucitavanje.value) "Šaljem…" else "Fiskaliziraj") },
+                text = { Text(if (vm.ucitavanje.value) "Šaljem…" else "Kreiraj račun") },
             )
         },
     ) { pad ->
         if (ishod != null) ResultView(vm, Modifier.padding(pad))
         else InvoiceForm(vm, tvrtka, Modifier.padding(pad), onPickArticle, onPickPartner)
     }
+
+    if (vm.stavkaUnos.value != null) StavkaUnosDijalog(vm, tvrtka?.uSustavuPdv == true)
 
     if (potvrdaIzlaza) AlertDialog(
         onDismissRequest = { potvrdaIzlaza = false },
@@ -108,10 +110,10 @@ fun InvoiceScreen(
         val produkcija = tvrtka?.okolina == hr.obrt.fiskal.fiskal.FiskalOkolina.PRODUKCIJA
         AlertDialog(
             onDismissRequest = { potvrdaFiskal = false },
-            title = { Text(if (vm.storno.value) "Fiskalizirati STORNO?" else "Fiskalizirati račun?") },
+            title = { Text(if (vm.storno.value) "Kreirati STORNO račun?" else "Kreirati račun?") },
             text = {
                 Column {
-                    Text("Stavki: ${vm.stavke.count { it.naziv.isNotBlank() }} · Ukupno: ${vm.ukupno().toPlainString()} €")
+                    Text("Stavki: ${vm.stavke.size} · Ukupno: ${vm.ukupno().toPlainString()} €")
                     if (vm.kupacNaziv.value.isNotBlank()) Text("Kupac: ${vm.kupacNaziv.value}")
                     Spacer(Modifier.height(6.dp))
                     Text(
@@ -121,7 +123,7 @@ fun InvoiceScreen(
                     )
                 }
             },
-            confirmButton = { TextButton(onClick = { potvrdaFiskal = false; vm.fiskaliziraj() }) { Text("Fiskaliziraj") } },
+            confirmButton = { TextButton(onClick = { potvrdaFiskal = false; vm.fiskaliziraj() }) { Text("Kreiraj račun") } },
             dismissButton = { TextButton(onClick = { potvrdaFiskal = false }) { Text("Odustani") } },
         )
     }
@@ -160,14 +162,21 @@ private fun InvoiceForm(
             )
         }
 
-        itemsIndexed(vm.stavke) { index, _ -> StavkaKartica(vm, index, pdv) }
+        if (vm.stavke.isEmpty()) {
+            item {
+                Text(
+                    "Nema stavki. Dodaj prvu stavku iz šifrarnika.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+
+        itemsIndexed(vm.stavke) { index, _ -> StavkaRedak(vm, index, pdv) }
 
         item {
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedButton(onClick = { vm.dodajStavku() }, modifier = Modifier.weight(1f)) {
-                    Icon(Icons.Filled.Add, null, Modifier.size(18.dp)); Spacer(Modifier.width(4.dp)); Text("Stavka")
-                }
-                FilledTonalButton(onClick = onPickArticle, modifier = Modifier.weight(1f)) { Text("Iz šifrarnika") }
+            FilledTonalButton(onClick = onPickArticle, modifier = Modifier.fillMaxWidth()) {
+                Icon(Icons.Filled.Add, null, Modifier.size(18.dp)); Spacer(Modifier.width(4.dp)); Text("Dodaj stavku iz šifrarnika")
             }
         }
 
@@ -203,51 +212,68 @@ private fun InvoiceForm(
     }
 }
 
+/** Redak potvrđene stavke — read-only prikaz (tap za uređivanje, ikona za brisanje). */
 @Composable
-private fun StavkaKartica(vm: AppViewModel, index: Int, pdv: Boolean) {
+private fun StavkaRedak(vm: AppViewModel, index: Int, pdv: Boolean) {
     val s = vm.stavke[index]
-    ElevatedCard {
-        Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
+    ElevatedCard(onClick = { vm.zapocniUredjivanjeStavke(index) }, modifier = Modifier.fillMaxWidth()) {
+        Row(Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f)) {
+                Text(s.naziv, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
                 Text(
-                    "Stavka ${index + 1}",
-                    style = MaterialTheme.typography.labelLarge,
-                    color = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.weight(1f),
+                    "${s.kolicina} ${s.jedMjere} × ${s.jedCijena.ifBlank { "0.00" }} €" +
+                        (if (pdv) " · PDV ${s.pdvStopa}%" else ""),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
-                IconButton(onClick = { vm.ukloniStavku(index) }) {
-                    Icon(Icons.Filled.Delete, "Ukloni", tint = MaterialTheme.colorScheme.error)
-                }
             }
-            OutlinedTextField(
-                value = s.naziv, onValueChange = { vm.setNaziv(index, it) },
-                label = { Text("Naziv") }, singleLine = true, modifier = Modifier.fillMaxWidth(),
+            Text(
+                "${s.ukupno.ifBlank { "0.00" }} €",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold,
             )
-            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                Polje(s.kolicina, "Količina", Modifier.weight(1f)) { vm.setKolicina(index, it) }
-                Polje(s.jedCijena, if (pdv) "Cijena (neto)" else "Cijena", Modifier.weight(1f)) { vm.setJedCijena(index, it) }
-            }
-            if (pdv) {
-                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Polje(s.pdvStopa, "PDV %", Modifier.weight(1f)) { vm.setStopa(index, it) }
-                    Polje(s.neto, "Neto", Modifier.weight(1f)) { vm.setNeto(index, it) }
-                }
-                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Polje(s.pdvIznos, "PDV €", Modifier.weight(1f)) { vm.setPdvIznos(index, it) }
-                    Polje(s.ukupno, "Ukupno", Modifier.weight(1f)) { vm.setUkupno(index, it) }
-                }
-            }
-            Divider()
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text("Ukupno stavke", style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
-                Text(
-                    "${s.ukupno.ifBlank { "0.00" }} €",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.SemiBold,
-                )
+            IconButton(onClick = { vm.ukloniStavku(index) }) {
+                Icon(Icons.Filled.Delete, "Ukloni", tint = MaterialTheme.colorScheme.error)
             }
         }
     }
+}
+
+/** Dijalog za dodavanje/uređivanje stavke — naziv/jed.mjere/PDV% su zaključani (iz artikla), mijenja se samo količina i cijena. */
+@Composable
+private fun StavkaUnosDijalog(vm: AppViewModel, pdv: Boolean) {
+    val u = vm.stavkaUnos.value ?: return
+    val ukupno = vm.izracunUnosa()
+    val uredjivanje = vm.uredjivanjeIndex.value != null
+    AlertDialog(
+        onDismissRequest = { vm.otkaziUnosStavke() },
+        title = { Text(if (uredjivanje) "Uredi stavku" else "Nova stavka") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Text(u.naziv, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                Text(
+                    "Jed. mjere: ${u.jedMjere}" + (if (pdv) " · PDV: ${u.pdvStopa}%" else ""),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Polje(u.kolicina, "Količina", Modifier.weight(1f)) { vm.setUnosKolicina(it) }
+                    Polje(u.jedCijena, if (pdv) "Cijena (neto)" else "Cijena", Modifier.weight(1f)) { vm.setUnosCijena(it) }
+                }
+                Divider()
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text("Ukupno stavke", style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
+                    Text(
+                        "${ukupno?.toPlainString() ?: "0.00"} €",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.SemiBold,
+                    )
+                }
+            }
+        },
+        confirmButton = { TextButton(onClick = { vm.potvrdiUnosStavke() }) { Text(if (uredjivanje) "Spremi" else "Dodaj") } },
+        dismissButton = { TextButton(onClick = { vm.otkaziUnosStavke() }) { Text("Odustani") } },
+    )
 }
 
 @Composable

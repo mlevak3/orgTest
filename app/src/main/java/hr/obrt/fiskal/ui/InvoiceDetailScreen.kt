@@ -39,8 +39,8 @@ import java.util.Locale
 fun InvoiceDetailScreen(vm: AppViewModel, onBack: () -> Unit, onCopy: () -> Unit) {
     val si = vm.detail.value ?: return
     val ctx = LocalContext.current
-    val data = remember(si.id) { vm.receiptFromSaved(si) }
-    val qr = remember(si.id) { QrRenderer.toBitmap(si.qrUrl, 600).asImageBitmap() }
+    val data = remember(si) { vm.receiptFromSaved(si) }
+    val qr = remember(si) { QrRenderer.toBitmap(si.qrUrl, 600).asImageBitmap() }
     val datum = remember { SimpleDateFormat("dd.MM.yyyy HH:mm:ss", Locale.ROOT).format(Date(si.createdAt)) }
 
     Scaffold(
@@ -90,6 +90,21 @@ fun InvoiceDetailScreen(vm: AppViewModel, onBack: () -> Unit, onCopy: () -> Unit
             }
             item { PoljeKopija("JIR", si.jir ?: "— (${si.status})", ctx) }
             item { PoljeKopija("ZKI", si.zki, ctx) }
+            if (si.jir == null) item {
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Text(
+                        "Račun nije fiskaliziran (nema JIR-a).",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.error,
+                    )
+                    Button(
+                        onClick = { vm.ponoviFiskalizaciju(si) },
+                        enabled = !vm.ucitavanje.value,
+                        modifier = Modifier.fillMaxWidth(),
+                    ) { Text(if (vm.ucitavanje.value) "Šaljem…" else "Pokušaj ponovno (fiskaliziraj)") }
+                    vm.greska.value?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall) }
+                }
+            }
             item { Image(bitmap = qr, contentDescription = "QR", modifier = Modifier.size(200.dp)) }
             item {
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
