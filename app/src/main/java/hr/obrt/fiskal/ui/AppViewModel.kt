@@ -88,7 +88,7 @@ enum class PeriodIzvjestaja(val naziv: String) {
 
 data class StavkaNacinPlac(val nacin: NacinPlac, val brojRacuna: Int, val ukupno: BigDecimal)
 data class StavkaPdv(val stopa: String, val osnovica: BigDecimal, val pdv: BigDecimal, val ukupno: BigDecimal)
-data class StavkaArtikl(val naziv: String, val kolicina: BigDecimal, val ukupno: BigDecimal)
+data class StavkaArtikl(val naziv: String, val kolicina: BigDecimal, val ukupno: BigDecimal, val jedMjere: String = "kom")
 
 data class Izvjestaj(
     val brojRacuna: Int,
@@ -681,14 +681,18 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
         val artKolicina = mutableMapOf<String, BigDecimal>()
         val artUkupno = mutableMapOf<String, BigDecimal>()
+        val artJedMjere = mutableMapOf<String, String>()
         filtrirano.forEach { si ->
             si.racun.stavke.forEach { s ->
                 artKolicina[s.naziv] = (artKolicina[s.naziv] ?: BigDecimal.ZERO).add(s.kolicina)
                 artUkupno[s.naziv] = (artUkupno[s.naziv] ?: BigDecimal.ZERO).add(s.ukupno)
+                if (s.jedMjere.isNotBlank()) artJedMjere.putIfAbsent(s.naziv, s.jedMjere)
             }
         }
         val poArtiklima = artUkupno.keys
-            .map { naziv -> StavkaArtikl(naziv, artKolicina[naziv] ?: BigDecimal.ZERO, fmt2(artUkupno[naziv] ?: BigDecimal.ZERO)) }
+            .map { naziv ->
+                StavkaArtikl(naziv, artKolicina[naziv] ?: BigDecimal.ZERO, fmt2(artUkupno[naziv] ?: BigDecimal.ZERO), artJedMjere[naziv] ?: "kom")
+            }
             .sortedByDescending { it.ukupno.abs() }
 
         return Izvjestaj(brojRacuna, ukupanPromet, poNacinu, pdvRekapitulacija, poArtiklima)

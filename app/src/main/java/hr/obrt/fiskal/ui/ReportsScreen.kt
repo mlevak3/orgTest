@@ -25,9 +25,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import hr.obrt.fiskal.fiskal.FiskalFormat
 import hr.obrt.fiskal.ui.components.FiskalCard
 import hr.obrt.fiskal.ui.components.FiskalChip
 import hr.obrt.fiskal.ui.components.FiskalEmptyState
@@ -113,18 +114,11 @@ fun ReportsScreen(vm: AppViewModel, onBack: () -> Unit) {
 
             item { NaslovSekcije("Rekapitulacija PDV-a") }
             if (izvjestaj.pdvRekapitulacija.isEmpty()) item { PrazniRedak() }
-            items(izvjestaj.pdvRekapitulacija) { g ->
-                IzvjestajRedak(
-                    "PDV ${g.stopa}%",
-                    "osnovica ${FiskalFormat.amount(g.osnovica)} · PDV ${FiskalFormat.amount(g.pdv)} · ukupno ${FiskalFormat.amount(g.ukupno)} €",
-                )
-            }
+            items(izvjestaj.pdvRekapitulacija) { g -> PdvRedak(g) }
 
             item { NaslovSekcije("Prodaja po artiklima") }
             if (izvjestaj.poArtiklima.isEmpty()) item { PrazniRedak() }
-            items(izvjestaj.poArtiklima) { a ->
-                IzvjestajRedak(a.naziv, "kol. ${a.kolicina.toPlainString()} · ${hrEur(a.ukupno)}")
-            }
+            items(izvjestaj.poArtiklima) { a -> ArtiklRedak(a) }
         }
     }
 }
@@ -173,13 +167,57 @@ private fun PrazniRedak() {
     )
 }
 
+/** Rekapitulacija po PDV stopi: badge sa stopom, osnovica/ukupno kao meta, iznos PDV-a desno. */
 @Composable
-private fun IzvjestajRedak(naziv: String, vrijednost: String) {
+private fun PdvRedak(g: StavkaPdv) {
+    val t = LocalFiskalTokens.current
+    val stopa = g.stopa.toBigDecimalOrNull()?.stripTrailingZeros()?.toPlainString() ?: g.stopa
+    FiskalCard(Modifier.fillMaxWidth()) {
+        Row(Modifier.padding(12.dp).fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            Box(
+                Modifier
+                    .clip(RoundedCornerShape(999.dp))
+                    .background(t.oliveTint)
+                    .padding(horizontal = 10.dp, vertical = 4.dp),
+            ) { Text("$stopa%", color = t.oliveTintInk, fontWeight = FontWeight.ExtraBold, style = MaterialTheme.typography.bodySmall, maxLines = 1, softWrap = false) }
+            Spacer(Modifier.width(10.dp))
+            Column(Modifier.weight(1f)) {
+                Text("Osnovica ${hrEur(g.osnovica)}", style = MaterialTheme.typography.bodyMedium, color = t.ink, maxLines = 1)
+                Text("Ukupno ${hrEur(g.ukupno)}", style = MaterialTheme.typography.bodySmall, color = t.muted, maxLines = 1)
+            }
+            Spacer(Modifier.width(10.dp))
+            Column(horizontalAlignment = Alignment.End) {
+                Text("PDV", style = MaterialTheme.typography.labelMedium, color = t.muted)
+                Text(hrEur(g.pdv), style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, color = t.ink, maxLines = 1, softWrap = false)
+            }
+        }
+    }
+}
+
+/** Prodaja po artiklu: naziv, količina s jedinicom mjere te iznos desno. */
+@Composable
+private fun ArtiklRedak(a: StavkaArtikl) {
     val t = LocalFiskalTokens.current
     FiskalCard(Modifier.fillMaxWidth()) {
         Row(Modifier.padding(12.dp).fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-            Text(naziv, style = MaterialTheme.typography.bodyMedium, color = t.ink, modifier = Modifier.weight(1f))
-            Text(vrijednost, style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Medium, color = t.muted)
+            Text(
+                a.naziv,
+                style = MaterialTheme.typography.bodyMedium,
+                color = t.ink,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f),
+            )
+            Spacer(Modifier.width(10.dp))
+            Text(
+                "${hrKolicina(a.kolicina)} ${a.jedMjere}",
+                style = MaterialTheme.typography.bodySmall,
+                color = t.muted,
+                maxLines = 1,
+                softWrap = false,
+            )
+            Spacer(Modifier.width(10.dp))
+            Text(hrEur(a.ukupno), style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, color = t.ink, maxLines = 1, softWrap = false)
         }
     }
 }
