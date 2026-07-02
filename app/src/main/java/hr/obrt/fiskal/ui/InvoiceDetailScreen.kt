@@ -1,10 +1,8 @@
 package hr.obrt.fiskal.ui
 
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.ContentCopy
@@ -22,7 +20,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.font.FontFamily
@@ -31,9 +28,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewModelScope
 import hr.obrt.fiskal.fiskal.BluetoothPrinter
 import hr.obrt.fiskal.fiskal.EscPosReceiptBuilder
-import hr.obrt.fiskal.fiskal.FiskalFormat
 import hr.obrt.fiskal.fiskal.InvoiceShare
-import hr.obrt.fiskal.fiskal.QrRenderer
 import hr.obrt.fiskal.fiskal.ReceiptPrinter
 import hr.obrt.fiskal.ui.components.FiskalCard
 import hr.obrt.fiskal.ui.components.FiskalOutlineButton
@@ -55,7 +50,6 @@ fun InvoiceDetailScreen(vm: AppViewModel, onBack: () -> Unit, onCopy: () -> Unit
     val si = vm.detail.value ?: return
     val ctx = LocalContext.current
     val data = remember(si) { vm.receiptFromSaved(si) }
-    val qr = remember(si) { QrRenderer.toBitmap(si.qrUrl, 600).asImageBitmap() }
     val datum = remember(si) { SimpleDateFormat("dd.MM.yyyy HH:mm:ss", Locale.ROOT).format(Date(si.createdAt)) }
 
     Column(Modifier.fillMaxSize().background(t.bg)) {
@@ -89,14 +83,20 @@ fun InvoiceDetailScreen(vm: AppViewModel, onBack: () -> Unit, onCopy: () -> Unit
                 FiskalCard(Modifier.fillMaxWidth()) {
                     Column(Modifier.padding(FiskalSpacing.card)) {
                         si.racun.stavke.forEachIndexed { index, s ->
-                            Column(Modifier.padding(vertical = 4.dp)) {
-                                Row {
-                                    Text(s.naziv, Modifier.weight(1f), color = t.ink)
-                                    Text(hrEur(s.ukupno), color = t.ink)
+                            val stopa = s.pdvStopa.stripTrailingZeros().toPlainString()
+                            Column(Modifier.padding(vertical = 6.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Text(s.naziv, Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge, color = t.ink)
+                                    Text(hrEur(s.ukupno), style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, color = t.ink)
                                 }
+                                Text(
+                                    "${hrKolicina(s.kolicina)} ${s.jedMjere} × ${hrEur(s.jedinicnaCijena())}",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = t.muted,
+                                )
                                 if (si.racun.zaglavlje.uSustavuPdv) {
                                     Text(
-                                        "neto ${FiskalFormat.amount(s.neto)} · PDV ${FiskalFormat.amount(s.pdvStopa)}% = ${FiskalFormat.amount(s.pdvIznos)}",
+                                        "Osnovica ${hrEur(s.neto)} · PDV $stopa% = ${hrEur(s.pdvIznos)}",
                                         style = MaterialTheme.typography.bodySmall,
                                         color = t.muted,
                                     )
@@ -135,12 +135,6 @@ fun InvoiceDetailScreen(vm: AppViewModel, onBack: () -> Unit, onCopy: () -> Unit
                         modifier = Modifier.fillMaxWidth(),
                     )
                     vm.greska.value?.let { Text(it, color = t.error, style = MaterialTheme.typography.bodySmall) }
-                }
-            }
-
-            item {
-                Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
-                    Image(bitmap = qr, contentDescription = "QR", modifier = Modifier.size(200.dp))
                 }
             }
 
