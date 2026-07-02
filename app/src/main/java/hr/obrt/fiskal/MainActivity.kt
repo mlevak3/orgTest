@@ -16,7 +16,6 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import hr.obrt.fiskal.ui.ActivityPickerScreen
 import hr.obrt.fiskal.ui.AppViewModel
 import hr.obrt.fiskal.ui.ArticlesScreen
-import hr.obrt.fiskal.ui.BackupScreen
 import hr.obrt.fiskal.ui.CompanyListScreen
 import hr.obrt.fiskal.ui.HistoryScreen
 import hr.obrt.fiskal.ui.HomeScreen
@@ -32,10 +31,10 @@ import hr.obrt.fiskal.ui.theme.FiskalTheme
 import hr.obrt.fiskal.data.AppPreferences
 
 private enum class Screen {
-    CompanyList, Home, Settings, ActivityPicker, InvoiceSetup, Invoice, History, Detail, Articles, Partners, Backup, Reports
+    CompanyList, Home, Settings, ActivityPicker, InvoiceSetup, Invoice, History, Detail, Articles, Partners, Reports
 }
 
-private val BOTTOM_NAV_SCREENS = setOf(Screen.Home, Screen.History, Screen.Partners, Screen.Reports)
+private val BOTTOM_NAV_SCREENS = setOf(Screen.Home, Screen.History, Screen.Articles, Screen.Partners, Screen.Reports)
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -84,16 +83,12 @@ class MainActivity : ComponentActivity() {
                         tema = tema,
                         onToggleTema = { tema = tema.sljedeca(); appPrefs.tema = tema },
                         onHistory = { vm.loadHistory(); screen = Screen.History },
-                        onArticles = { vm.biranjeArtikla.value = false; vm.loadArticles(); screen = Screen.Articles },
                         onSettings = { vm.selected.value?.let { vm.editCompany(it) }; screen = Screen.Settings },
                         onCompanies = { screen = Screen.CompanyList },
-                        onBackup = { screen = Screen.Backup },
                         onOpenInvoice = { vm.loadHistory(); vm.openDetail(it); screen = Screen.Detail },
                     )
 
                     Screen.Reports -> ReportsScreen(vm, onBack = { screen = Screen.Home })
-
-                    Screen.Backup -> BackupScreen(onBack = { vm.refreshCompanies(); screen = Screen.Home })
 
                     Screen.Settings -> SettingsScreen(
                         vm,
@@ -160,16 +155,22 @@ class MainActivity : ComponentActivity() {
                     )
                 }
 
-                if (screen in BOTTOM_NAV_SCREENS) {
+                // Nav se ne prikazuje dok se s računa bira artikl/partner — tada su
+                // Articles/Partners ekrani u "picker" modu i vode natrag na račun.
+                val birackiMod = (screen == Screen.Articles && vm.biranjeArtikla.value) ||
+                    (screen == Screen.Partners && vm.biranjePartnera.value)
+                if (screen in BOTTOM_NAV_SCREENS && !birackiMod) {
                     FiskalBottomNav(
                         current = when (screen) {
                             Screen.History -> NavTab.RACUNI
+                            Screen.Articles -> NavTab.ARTIKLI
                             Screen.Partners -> NavTab.PARTNERI
                             Screen.Reports -> NavTab.IZVJESTAJI
                             else -> NavTab.POCETNA
                         },
                         onPocetna = { screen = Screen.Home },
                         onRacuni = { vm.loadHistory(); screen = Screen.History },
+                        onArtikli = { vm.biranjeArtikla.value = false; vm.loadArticles(); screen = Screen.Articles },
                         onPartneri = { vm.biranjePartnera.value = false; vm.loadPartners(); screen = Screen.Partners },
                         onIzvjestaji = { screen = Screen.Reports },
                         onNoviRacun = onNewInvoice,

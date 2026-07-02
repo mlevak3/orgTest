@@ -19,6 +19,7 @@ import androidx.compose.material.icons.rounded.Brightness4
 import androidx.compose.material.icons.rounded.Brightness6
 import androidx.compose.material.icons.rounded.Brightness7
 import androidx.compose.material.icons.rounded.ExpandMore
+import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material.icons.rounded.Storefront
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -40,6 +41,7 @@ fun HeroHeader(
     tema: TemaAplikacije,
     onToggleTema: () -> Unit,
     onCompanies: () -> Unit,
+    onSettings: () -> Unit,
     prometDanasText: String,
     brojDanas: Int,
     prometMjesecText: String,
@@ -71,6 +73,13 @@ fun HeroHeader(
                 ) { Text(okolinaLabel, color = t.oliveInk, style = MaterialTheme.typography.labelMedium, maxLines = 1) }
                 Spacer(Modifier.width(4.dp))
                 Icon(Icons.Rounded.ExpandMore, "Promijeni tvrtku", tint = t.oliveInk, modifier = Modifier.size(20.dp))
+            }
+            Spacer(Modifier.width(8.dp))
+            Box(
+                Modifier.size(38.dp).clip(CircleShape).background(t.oliveInk.copy(alpha = 0.12f)).clickable(onClick = onSettings),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(Icons.Rounded.Settings, "Postavke tvrtke", tint = t.oliveInk, modifier = Modifier.size(18.dp))
             }
             Spacer(Modifier.width(8.dp))
             Box(

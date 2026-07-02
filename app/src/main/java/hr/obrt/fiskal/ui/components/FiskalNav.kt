@@ -19,6 +19,7 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.rounded.BarChart
 import androidx.compose.material.icons.rounded.Group
 import androidx.compose.material.icons.rounded.Home
+import androidx.compose.material.icons.rounded.Inventory2
 import androidx.compose.material.icons.rounded.ReceiptLong
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -29,16 +30,18 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import hr.obrt.fiskal.ui.theme.LocalFiskalTokens
 
-enum class NavTab { POCETNA, RACUNI, PARTNERI, IZVJESTAJI }
+enum class NavTab { POCETNA, RACUNI, ARTIKLI, PARTNERI, IZVJESTAJI }
 
-/** Donja navigacija — 5 slotova s centralnim terakota FAB-om za novi račun. BRAND-UPUTE 8.14. */
+/** Donja navigacija — tabovi s centralnim terakota FAB-om za novi račun. BRAND-UPUTE 8.14. */
 @Composable
 fun FiskalBottomNav(
     current: NavTab,
     onPocetna: () -> Unit,
     onRacuni: () -> Unit,
+    onArtikli: () -> Unit,
     onPartneri: () -> Unit,
     onIzvjestaji: () -> Unit,
     onNoviRacun: () -> Unit,
@@ -56,9 +59,12 @@ fun FiskalBottomNav(
                 .padding(horizontal = 8.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            NavItem(Icons.Rounded.Home, "Početna", current == NavTab.POCETNA, onPocetna, Modifier.weight(1f))
-            NavItem(Icons.Rounded.ReceiptLong, "Računi", current == NavTab.RACUNI, onRacuni, Modifier.weight(1f))
-            Spacer(Modifier.width(56.dp))
+            // Lijeva dva taba imaju weight 1.5f, desna tri 1f — zbroj težina s obje
+            // strane FAB praznine je jednak pa FAB ostaje točno na sredini.
+            NavItem(Icons.Rounded.Home, "Početna", current == NavTab.POCETNA, onPocetna, Modifier.weight(1.5f))
+            NavItem(Icons.Rounded.ReceiptLong, "Računi", current == NavTab.RACUNI, onRacuni, Modifier.weight(1.5f))
+            Spacer(Modifier.width(60.dp))
+            NavItem(Icons.Rounded.Inventory2, "Artikli", current == NavTab.ARTIKLI, onArtikli, Modifier.weight(1f))
             NavItem(Icons.Rounded.Group, "Partneri", current == NavTab.PARTNERI, onPartneri, Modifier.weight(1f))
             NavItem(Icons.Rounded.BarChart, "Izvještaji", current == NavTab.IZVJESTAJI, onIzvjestaji, Modifier.weight(1f))
         }
@@ -87,6 +93,12 @@ private fun NavItem(icon: androidx.compose.ui.graphics.vector.ImageVector, label
     ) {
         Icon(icon, label, tint = boja, modifier = Modifier.size(22.dp))
         Spacer(Modifier.height(2.dp))
-        Text(label, color = boja, style = MaterialTheme.typography.labelMedium, maxLines = 1)
+        Text(
+            label,
+            color = boja,
+            style = MaterialTheme.typography.labelMedium.copy(fontSize = 10.sp),
+            maxLines = 1,
+            softWrap = false,
+        )
     }
 }

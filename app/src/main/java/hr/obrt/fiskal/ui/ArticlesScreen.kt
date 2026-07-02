@@ -96,10 +96,11 @@ fun ArticlesScreen(vm: AppViewModel, onPick: ((Artikl) -> Unit)?, onBack: () -> 
             }
         }
 
+        // Podignut iznad donje navigacije (ona se crta preko ovog ekrana) da ostane vidljiv.
         FiskalTerracottaButton(
             "Novi artikl",
             onClick = { vm.newArticle() },
-            modifier = Modifier.align(Alignment.BottomEnd).padding(FiskalSpacing.screenX),
+            modifier = Modifier.align(Alignment.BottomEnd).padding(end = FiskalSpacing.screenX, bottom = FiskalSpacing.listPad),
         )
     }
 

@@ -57,7 +57,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
-private val TAB_NASLOVI = listOf("Podaci", "Djelatnosti", "Fiskalizacija", "Printeri")
+private val TAB_NASLOVI = listOf("Podaci", "Djelatnosti", "Fiskalizacija", "Printeri", "Sig. kopija")
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -327,6 +327,7 @@ fun SettingsScreen(vm: AppViewModel, onClose: () -> Unit) {
                         }
                     },
                 )
+                4 -> TabSigKopija(vm) { poruka = it }
             }
             Spacer(Modifier.height(12.dp))
         }
@@ -647,6 +648,75 @@ private fun TabFiskalizacija(
         }
     }
     OutlinedButton(onClick = onTestEcho, modifier = Modifier.fillMaxWidth()) { Text("Test veze (Echo)") }
+}
+
+/** Izvoz/uvoz svih podataka aplikacije — kao tab u postavkama, ne zaseban ekran. */
+@Composable
+private fun TabSigKopija(vm: AppViewModel, onPoruka: (String) -> Unit) {
+    val ctx = LocalContext.current
+    val scope = rememberCoroutineScope()
+    val t = hr.obrt.fiskal.ui.theme.LocalFiskalTokens.current
+    var radi by remember { mutableStateOf(false) }
+
+    val exportLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/json")) { uri ->
+        if (uri == null) return@rememberLauncherForActivityResult
+        radi = true
+        scope.launch {
+            val ok = withContext(Dispatchers.IO) {
+                runCatching {
+                    val json = hr.obrt.fiskal.data.BackupManager.export(ctx)
+                    ctx.contentResolver.openOutputStream(uri)?.use { it.write(json.toByteArray()) }
+                        ?: error("Ne mogu otvoriti datoteku za pisanje.")
+                }
+            }
+            radi = false
+            onPoruka(ok.fold({ "Sigurnosna kopija spremljena." }, { "Izvoz nije uspio: ${it.message}" }))
+        }
+    }
+    val importLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        if (uri == null) return@rememberLauncherForActivityResult
+        radi = true
+        scope.launch {
+            val res = withContext(Dispatchers.IO) {
+                runCatching {
+                    val json = ctx.contentResolver.openInputStream(uri)!!.use { it.readBytes() }.toString(Charsets.UTF_8)
+                    hr.obrt.fiskal.data.BackupManager.import(ctx, json).getOrThrow()
+                }
+            }
+            radi = false
+            res.onSuccess { vm.refreshCompanies() }
+            onPoruka(res.fold({ n -> "Uvezeno tvrtki: $n." }, { "Uvoz nije uspio: ${it.message}" }))
+        }
+    }
+
+    Text("Sigurnosna kopija", style = MaterialTheme.typography.titleMedium)
+    Text(
+        "Izvezi ili uvezi sve podatke aplikacije: tvrtke, FINA certifikate, šifrarnik artikala i povijest računa.",
+        style = MaterialTheme.typography.bodyMedium,
+    )
+    Box(Modifier.fillMaxWidth().background(t.errorBg, RoundedCornerShape(16.dp)).padding(12.dp)) {
+        Text(
+            "Datoteka sadrži osjetljive podatke — privatni certifikat i njegovu lozinku. Čuvaj je sigurno i ne dijeli s nepoznatima.",
+            style = MaterialTheme.typography.bodySmall,
+            color = t.error,
+        )
+    }
+    hr.obrt.fiskal.ui.components.FiskalPrimaryButton(
+        "Izvezi sigurnosnu kopiju",
+        enabled = !radi,
+        onClick = {
+            val ime = "fiskal-backup-${java.text.SimpleDateFormat("yyyyMMdd-HHmm", java.util.Locale.ROOT).format(java.util.Date())}.json"
+            exportLauncher.launch(ime)
+        },
+        modifier = Modifier.fillMaxWidth(),
+    )
+    hr.obrt.fiskal.ui.components.FiskalOutlineButton(
+        "Uvezi sigurnosnu kopiju",
+        enabled = !radi,
+        onClick = { importLauncher.launch(arrayOf("application/json", "*/*")) },
+        modifier = Modifier.fillMaxWidth(),
+    )
+    if (radi) LinearProgressIndicator(Modifier.fillMaxWidth())
 }
 
 @Composable

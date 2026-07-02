@@ -7,11 +7,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.ChevronRight
-import androidx.compose.material.icons.rounded.CloudUpload
-import androidx.compose.material.icons.rounded.Inventory2
 import androidx.compose.material.icons.rounded.Print
-import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material.icons.rounded.Share
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -30,7 +26,6 @@ import hr.obrt.fiskal.fiskal.InvoiceShare
 import hr.obrt.fiskal.fiskal.ReceiptPrinter
 import hr.obrt.fiskal.ui.components.FiskalCard
 import hr.obrt.fiskal.ui.components.HeroHeader
-import hr.obrt.fiskal.ui.components.IconTile
 import hr.obrt.fiskal.ui.components.StatusBadge
 import hr.obrt.fiskal.ui.theme.FiskalSpacing
 import hr.obrt.fiskal.ui.theme.LocalFiskalTokens
@@ -44,10 +39,8 @@ fun HomeScreen(
     tema: TemaAplikacije,
     onToggleTema: () -> Unit,
     onHistory: () -> Unit,
-    onArticles: () -> Unit,
     onSettings: () -> Unit,
     onCompanies: () -> Unit,
-    onBackup: () -> Unit,
     onOpenInvoice: (SavedInvoice) -> Unit,
 ) {
     val t = LocalFiskalTokens.current
@@ -64,6 +57,7 @@ fun HomeScreen(
             tema = tema,
             onToggleTema = onToggleTema,
             onCompanies = onCompanies,
+            onSettings = onSettings,
             prometDanasText = hrEur(prometDanas),
             brojDanas = brojDanas,
             prometMjesecText = hrEur(prometMjesec),
@@ -116,16 +110,6 @@ fun HomeScreen(
                 }
             }
 
-            Text("Ostalo", style = MaterialTheme.typography.titleSmall, color = t.ink)
-            FiskalCard(Modifier.fillMaxWidth()) {
-                Column {
-                    OstaloRedak("Šifrarnik artikala", Icons.Rounded.Inventory2, onArticles)
-                    androidx.compose.material3.Divider(color = t.border, modifier = Modifier.padding(horizontal = FiskalSpacing.card))
-                    OstaloRedak("Postavke tvrtke", Icons.Rounded.Settings, onSettings)
-                    androidx.compose.material3.Divider(color = t.border, modifier = Modifier.padding(horizontal = FiskalSpacing.card))
-                    OstaloRedak("Sigurnosna kopija", Icons.Rounded.CloudUpload, onBackup)
-                }
-            }
             Spacer(Modifier.height(FiskalSpacing.listPad))
         }
     }
@@ -138,18 +122,4 @@ private fun KrugGumb(ikona: ImageVector, onClick: () -> Unit) {
         Modifier.size(36.dp).clip(CircleShape).background(t.oliveTint).clickable(onClick = onClick),
         contentAlignment = Alignment.Center,
     ) { Icon(ikona, null, tint = t.oliveTintInk, modifier = Modifier.size(18.dp)) }
-}
-
-@Composable
-private fun OstaloRedak(naslov: String, ikona: ImageVector, onClick: () -> Unit) {
-    val t = LocalFiskalTokens.current
-    Row(
-        Modifier.fillMaxWidth().clickable(onClick = onClick).padding(horizontal = FiskalSpacing.card, vertical = 14.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        IconTile(ikona, size = 36.dp)
-        Spacer(Modifier.width(12.dp))
-        Text(naslov, style = MaterialTheme.typography.bodyLarge, color = t.ink, modifier = Modifier.weight(1f))
-        Icon(Icons.Rounded.ChevronRight, null, tint = t.mutedSoft)
-    }
 }
