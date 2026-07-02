@@ -21,6 +21,19 @@ class FiskalCertificate private constructor(
         Regex("\\d{11}").find(certificate.subjectX500Principal.name)?.value
     }
 
+    /**
+     * Naziv izdavatelja (CA) certifikata — koristan za dijagnostiku: DEMO certifikat
+     * mora biti izdan od FINA DEMO CA da bi ga testni CIS (cistest) prihvatio; ako
+     * je učitan produkcijski certifikat (FINA RDC 2020 i sl.), CIS testna okolina
+     * ga odbija s greškom o neispravnom potpisu iako je matematički potpis ispravan.
+     */
+    val izdavatelj: String get() = certificate.issuerX500Principal.name
+
+    /** Je li certifikat trenutno u razdoblju valjanosti (nije istekao niti još ne vrijedi). */
+    val jeValjan: Boolean get() = runCatching { certificate.checkValidity(); true }.getOrDefault(false)
+
+    val vrijediDo: java.util.Date get() = certificate.notAfter
+
     companion object {
         /**
          * Učita PKCS#12 spremnik i izvuče prvi unos koji sadrži privatni ključ.

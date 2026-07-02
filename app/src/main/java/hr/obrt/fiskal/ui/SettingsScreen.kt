@@ -309,7 +309,14 @@ fun SettingsScreen(vm: AppViewModel, onClose: () -> Unit) {
                             runCatching {
                                 FiskalCertificate.load(store.certBytes(company.id)!!.inputStream(), lozinka.toCharArray())
                             }.fold(
-                                onSuccess = { "Certifikat OK (OIB iz cert.: ${it.oibIzCertifikata ?: "?"})." },
+                                onSuccess = { c ->
+                                    val datum = java.text.SimpleDateFormat("dd.MM.yyyy", java.util.Locale.ROOT).format(c.vrijediDo)
+                                    val upozorenje = if (!c.jeValjan) " ⚠ CERTIFIKAT JE ISTEKAO/NEVALJAN — CIS će ga odbiti." else ""
+                                    val okolinaUpozorenje = if (okolina == FiskalOkolina.TEST && !c.izdavatelj.contains("DEMO", ignoreCase = true))
+                                        " ⚠ Izdavatelj ne sadrži 'DEMO' — provjeri koristiš li stvarno FINA DEMO certifikat za testnu okolinu (produkcijski certifikat CIS test odbija s greškom potpisa)."
+                                    else ""
+                                    "Certifikat OK. OIB: ${c.oibIzCertifikata ?: "?"} · Izdavatelj: ${c.izdavatelj} · Vrijedi do: $datum.$upozorenje$okolinaUpozorenje"
+                                },
                                 onFailure = { "Certifikat/lozinka neispravni: ${it.message}" },
                             )
                         } else null
