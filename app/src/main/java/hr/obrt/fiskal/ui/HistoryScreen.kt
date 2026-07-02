@@ -7,6 +7,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.Print
 import androidx.compose.material.icons.rounded.ReceiptLong
 import androidx.compose.material.icons.rounded.Share
@@ -14,7 +15,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -83,16 +83,30 @@ fun HistoryScreen(vm: AppViewModel, onOpen: (SavedInvoice) -> Unit, onBack: () -
         }
 
     Column(Modifier.fillMaxSize().background(t.bg)) {
-        LightHeader("Računi", "${vm.history.size} računa", onBack = onBack)
+        LightHeader(
+            "Računi",
+            "${vm.history.size} računa",
+            onBack = onBack,
+            akcija = {
+                Column(horizontalAlignment = Alignment.End) {
+                    Text(
+                        "Danas ${hrEur(prometDanas)}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = t.ink,
+                        fontWeight = FontWeight.Bold,
+                        maxLines = 1,
+                    )
+                    Text(
+                        "Mjesec ${hrEur(prometMjesec)}",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = t.muted,
+                        maxLines = 1,
+                    )
+                }
+            },
+        )
 
         Column(Modifier.padding(horizontal = FiskalSpacing.screenX), verticalArrangement = Arrangement.spacedBy(FiskalSpacing.stackGap)) {
-            FiskalCard(Modifier.fillMaxWidth()) {
-                Row(Modifier.padding(FiskalSpacing.card).fillMaxWidth()) {
-                    PrometStavka("Promet danas", prometDanas, Modifier.weight(1f))
-                    PrometStavka("Ovaj mjesec", prometMjesec, Modifier.weight(1f))
-                }
-            }
-
             SearchPill(q, { q = it }, "Pretraži broj, JIR, kupca, iznos…")
 
             Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -102,28 +116,23 @@ fun HistoryScreen(vm: AppViewModel, onOpen: (SavedInvoice) -> Unit, onBack: () -
             }
 
             Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
-                OutlinedButton(
+                DatumFilterGumb(
+                    "Od",
+                    filterOd,
+                    modifier = Modifier.weight(1f),
                     onClick = { odaberiDatumVrijeme(ctx, filterOd ?: pocetakDana()) { filterOd = it } },
+                )
+                DatumFilterGumb(
+                    "Do",
+                    filterDo,
                     modifier = Modifier.weight(1f),
-                ) {
-                    Text(
-                        filterOd?.let { "Od: ${formatDatumVrijeme(it)}" } ?: "Od: —",
-                        style = MaterialTheme.typography.bodySmall,
-                        maxLines = 1,
-                    )
-                }
-                OutlinedButton(
                     onClick = { odaberiDatumVrijeme(ctx, filterDo ?: System.currentTimeMillis()) { filterDo = it } },
-                    modifier = Modifier.weight(1f),
-                ) {
-                    Text(
-                        filterDo?.let { "Do: ${formatDatumVrijeme(it)}" } ?: "Do: —",
-                        style = MaterialTheme.typography.bodySmall,
-                        maxLines = 1,
-                    )
-                }
+                )
                 if (filterOd != null || filterDo != null) {
-                    TextButton(onClick = { filterOd = null; filterDo = null }) { Text("×") }
+                    Box(
+                        Modifier.size(36.dp).clip(CircleShape).background(t.errorBg).clickable { filterOd = null; filterDo = null },
+                        contentAlignment = Alignment.Center,
+                    ) { Icon(Icons.Rounded.Close, "Ukloni datumski filter", tint = t.error, modifier = Modifier.size(18.dp)) }
                 }
             }
         }
@@ -181,14 +190,31 @@ private fun KrugAkcija(icon: androidx.compose.ui.graphics.vector.ImageVector, on
     ) { Icon(icon, null, tint = t.oliveTintInk, modifier = Modifier.size(18.dp)) }
 }
 
+/** Gumb datumskog filtra — oznaka (Od/Do) iznad kompaktne vrijednosti, da odabrani datum/vrijeme uvijek stane. */
 @Composable
-private fun PrometStavka(naziv: String, iznos: BigDecimal, modifier: Modifier) {
+private fun DatumFilterGumb(oznaka: String, vrijednost: Long?, modifier: Modifier = Modifier, onClick: () -> Unit) {
     val t = LocalFiskalTokens.current
-    Column(modifier) {
-        Text(naziv, style = MaterialTheme.typography.labelMedium, color = t.muted)
-        Text(hrEur(iznos), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = t.ink)
+    OutlinedButton(
+        onClick = onClick,
+        modifier = modifier,
+        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 8.dp),
+    ) {
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Text(oznaka, style = MaterialTheme.typography.labelMedium, color = t.muted)
+            Text(
+                vrijednost?.let { formatDatumKratko(it) } ?: "—",
+                style = MaterialTheme.typography.bodySmall,
+                fontWeight = FontWeight.Medium,
+                maxLines = 1,
+                softWrap = false,
+                overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+            )
+        }
     }
 }
+
+private fun formatDatumKratko(millis: Long): String =
+    SimpleDateFormat("dd.MM.yy HH:mm", Locale.ROOT).format(Date(millis))
 
 private fun zbroj(list: List<SavedInvoice>, uvjet: (SavedInvoice) -> Boolean): BigDecimal =
     list.filter(uvjet).fold(BigDecimal.ZERO) { acc, si -> acc.add(si.racun.iznosUkupno) }
