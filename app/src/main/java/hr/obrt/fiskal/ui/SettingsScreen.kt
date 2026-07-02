@@ -61,7 +61,7 @@ private val TAB_NASLOVI = listOf("Podaci", "Djelatnosti", "Fiskalizacija", "Prin
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun SettingsScreen(vm: AppViewModel, onClose: () -> Unit) {
+fun SettingsScreen(vm: AppViewModel, onClose: () -> Unit, onOpenFiskalLog: () -> Unit) {
     val ctx = LocalContext.current
     val scope = rememberCoroutineScope()
     val store = vm.companyStore
@@ -321,6 +321,7 @@ fun SettingsScreen(vm: AppViewModel, onClose: () -> Unit) {
                             )
                         } else null
                     },
+                    onOpenFiskalLog = { vm.loadFiskalLog(); onOpenFiskalLog() },
                 )
                 3 -> TabPrinteri(
                     printerAddress, printerName,
@@ -625,6 +626,7 @@ private fun TabFiskalizacija(
     onUcitajCert: () -> Unit, onUkloniCert: () -> Unit, certPostoji: Boolean,
     onUcitajCa: () -> Unit, onUkloniCa: () -> Unit, caPostoji: Boolean,
     onTestEcho: () -> Unit, onProvjeriCert: () -> Unit,
+    onOpenFiskalLog: () -> Unit,
 ) {
     Text("FINA certifikat (.p12 / .pfx)", style = MaterialTheme.typography.titleMedium)
     Text(certInfo, style = MaterialTheme.typography.bodySmall)
@@ -663,6 +665,14 @@ private fun TabFiskalizacija(
         }
     }
     OutlinedButton(onClick = onTestEcho, modifier = Modifier.fillMaxWidth()) { Text("Test veze (Echo)") }
+
+    Divider()
+    Text("Log fiskalizacije", style = MaterialTheme.typography.titleMedium)
+    Text(
+        "Zahtjev i odgovor CIS-a za svaki pokušaj fiskalizacije — korisno za dijagnostiku grešaka.",
+        style = MaterialTheme.typography.bodySmall,
+    )
+    OutlinedButton(onClick = onOpenFiskalLog, modifier = Modifier.fillMaxWidth()) { Text("Prikaži log fiskalizacije") }
 }
 
 /** Izvoz/uvoz svih podataka aplikacije — kao tab u postavkama, ne zaseban ekran. */

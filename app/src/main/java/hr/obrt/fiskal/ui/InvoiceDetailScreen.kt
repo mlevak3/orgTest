@@ -12,8 +12,11 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -52,7 +55,18 @@ fun InvoiceDetailScreen(vm: AppViewModel, onBack: () -> Unit, onCopy: () -> Unit
     val data = remember(si) { vm.receiptFromSaved(si) }
     val datum = remember(si) { SimpleDateFormat("dd.MM.yyyy HH:mm:ss", Locale.ROOT).format(Date(si.createdAt)) }
 
-    Column(Modifier.fillMaxSize().background(t.bg)) {
+    // Vidljiva potvrda ishoda "Pokušaj ponovno (fiskaliziraj)" — bez ovoga se ekran
+    // samo tiho osvježi (nestane gumb/JIR se pojavi), lako za promašiti.
+    val snackbarHostState = remember { SnackbarHostState() }
+    LaunchedEffect(vm.ponoviPoruka.value) {
+        vm.ponoviPoruka.value?.let {
+            snackbarHostState.showSnackbar(it)
+            vm.ponoviPoruka.value = null
+        }
+    }
+
+    Box(Modifier.fillMaxSize()) {
+        Column(Modifier.fillMaxSize().background(t.bg)) {
         LightHeader("Račun ${si.brojRacuna()}", si.naslovTvrtke, onBack = onBack)
 
         LazyColumn(
@@ -194,6 +208,8 @@ fun InvoiceDetailScreen(vm: AppViewModel, onBack: () -> Unit, onCopy: () -> Unit
                 )
             }
         }
+        }
+        SnackbarHost(snackbarHostState, modifier = Modifier.align(Alignment.BottomCenter))
     }
 }
 

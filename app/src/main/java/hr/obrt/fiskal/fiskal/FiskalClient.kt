@@ -18,6 +18,9 @@ enum class FiskalOkolina(val url: String, val opis: String) {
     PRODUKCIJA("https://cis.porezna-uprava.hr:8449/FiskalizacijaService", "Produkcija (FINA certifikat)"),
 }
 
+/** HTTP odgovor CIS-a uz razriješeni [FiskalRezultat] — za log fiskalizacije (zahtjev/odgovor). */
+data class FiskalHttpOdgovor(val rezultat: FiskalRezultat, val httpKod: Int, val rawTijelo: String)
+
 /** Rezultat fiskalizacije računa. */
 sealed interface FiskalRezultat {
     /** Račun je fiskaliziran — CIS je vratio JIR. */
@@ -50,7 +53,7 @@ class FiskalClient(
 ) {
     private val http: OkHttpClient by lazy { buildClient() }
 
-    fun posalji(soapEnvelope: String): FiskalRezultat {
+    fun posalji(soapEnvelope: String): FiskalHttpOdgovor {
         val request = Request.Builder()
             .url(okolina.url)
             .addHeader("Content-Type", "text/xml; charset=UTF-8")
@@ -62,23 +65,25 @@ class FiskalClient(
         val resp = try {
             http.newCall(request).execute()
         } catch (e: Exception) {
-            return FiskalRezultat.Mreza(opisMrezne(e))
+            return FiskalHttpOdgovor(FiskalRezultat.Mreza(opisMrezne(e)), -1, "")
         }
 
         resp.use {
             val code = it.code
             val text = try { it.body?.string().orEmpty() } catch (e: Exception) {
-                return FiskalRezultat.Neizvjesno(
-                    "Odgovor je primljen (HTTP $code), ali se nije mogao pročitati: ${e.message}", "",
+                return FiskalHttpOdgovor(
+                    FiskalRezultat.Neizvjesno("Odgovor je primljen (HTTP $code), ali se nije mogao pročitati: ${e.message}", ""),
+                    code, "",
                 )
             }
             if (text.isBlank()) {
-                return if (code in 200..299)
+                val rezultat = if (code in 200..299)
                     FiskalRezultat.Neizvjesno("Prazan odgovor poslužitelja (HTTP $code).", "")
                 else
                     FiskalRezultat.Mreza("Poslužitelj je vratio HTTP $code bez sadržaja.")
+                return FiskalHttpOdgovor(rezultat, code, "")
             }
-            return parse(text, code)
+            return FiskalHttpOdgovor(parse(text, code), code, text)
         }
     }
 

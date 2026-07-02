@@ -9,6 +9,8 @@ import hr.obrt.fiskal.data.Artikl
 import hr.obrt.fiskal.data.ArticleStore
 import hr.obrt.fiskal.data.CompanyStore
 import hr.obrt.fiskal.data.Djelatnost
+import hr.obrt.fiskal.data.FiskalLogStore
+import hr.obrt.fiskal.data.FiskalLogUnos
 import hr.obrt.fiskal.data.InvoiceStore
 import hr.obrt.fiskal.data.NaplatniUredaj
 import hr.obrt.fiskal.data.Partner
@@ -118,6 +120,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     private val invoiceStore = InvoiceStore(app)
     private val articleStore = ArticleStore(app)
     private val partnerStore = PartnerStore(app)
+    private val fiskalLogStore = FiskalLogStore(app)
 
     // --- Tvrtke ---
     val companies = mutableStateListOf<Tvrtka>()
@@ -158,10 +161,15 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     val ucitavanje = mutableStateOf(false)
     val ishod = mutableStateOf<FiskalIshod?>(null)
     val greska = mutableStateOf<String?>(null)
+    /** Poruka o ishodu zadnjeg pokušaja ponovne fiskalizacije — za vidljivu potvrdu u UI-u (snackbar). */
+    val ponoviPoruka = mutableStateOf<String?>(null)
 
     // --- Povijest ---
     val history = mutableStateListOf<SavedInvoice>()
     val detail = mutableStateOf<SavedInvoice?>(null)
+
+    // --- Log fiskalizacije (zahtjev/odgovor svakog pokušaja) ---
+    val fiskalLog = mutableStateListOf<FiskalLogUnos>()
 
     init {
         refreshCompanies()
@@ -494,13 +502,32 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         ishod
     }
 
+    private fun statusZaIshod(ishod: FiskalIshod): String = when (val r = ishod.rezultat) {
+        is FiskalRezultat.Uspjeh -> "Fiskaliziran"
+        is FiskalRezultat.Greska -> "CIS greška: ${r.sifra} ${r.poruka}"
+        is FiskalRezultat.Neizvjesno -> "NEIZVJESNO — provjeri (možda fiskalizirano)"
+        is FiskalRezultat.Mreza -> "Nije poslano: ${r.poruka}"
+    }
+
+    /** Bilježi zahtjev/odgovor pokušaja fiskalizacije u log — neovisno o ishodu. */
+    private fun zapisiFiskalLog(companyId: String, ishod: FiskalIshod, status: String) {
+        fiskalLogStore.zapisi(
+            FiskalLogUnos(
+                companyId = companyId,
+                vrijeme = System.currentTimeMillis(),
+                brojRacuna = "${ishod.racun.brOznRac}/${ishod.racun.zaglavlje.oznPosPr}/${ishod.racun.zaglavlje.oznNapUr}",
+                nakDost = ishod.racun.nakDost,
+                ishod = status,
+                httpKod = ishod.httpKod,
+                requestXml = ishod.zahtjevXml,
+                responseXml = ishod.odgovorXml,
+            )
+        )
+    }
+
     private fun spremiUPovijest(t: Tvrtka, ishod: FiskalIshod) {
-        val status = when (val r = ishod.rezultat) {
-            is FiskalRezultat.Uspjeh -> "Fiskaliziran"
-            is FiskalRezultat.Greska -> "CIS greška: ${r.sifra} ${r.poruka}"
-            is FiskalRezultat.Neizvjesno -> "NEIZVJESNO — provjeri (možda fiskalizirano)"
-            is FiskalRezultat.Mreza -> "Nije poslano: ${r.poruka}"
-        }
+        val status = statusZaIshod(ishod)
+        zapisiFiskalLog(t.id, ishod, status)
         invoiceStore.spremi(
             SavedInvoice(
                 id = UUID.randomUUID().toString(),
@@ -650,6 +677,19 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         val t = selected.value ?: return
         history.clear()
         history.addAll(invoiceStore.zaTvrtku(t.id))
+    }
+
+    // --- Log fiskalizacije ---
+    fun loadFiskalLog() {
+        val t = selected.value ?: return
+        fiskalLog.clear()
+        fiskalLog.addAll(fiskalLogStore.zaTvrtku(t.id))
+    }
+
+    fun obrisiFiskalLog() {
+        val t = selected.value ?: return
+        fiskalLogStore.obrisiSve(t.id)
+        fiskalLog.clear()
     }
 
     /** Broj računa i promet za danas (odabrana tvrtka, svi računi — fiskalizirani i nefiskalizirani). Za prikaz na početnoj. */
@@ -805,13 +845,25 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     fun ponoviFiskalizaciju(si: SavedInvoice) {
         if (si.jir != null) return
         greska.value = null
+        ponoviPoruka.value = null
         ucitavanje.value = true
         viewModelScope.launch {
             val rezultat = withContext(Dispatchers.IO) { ponoviIzvrsi(si) }
             ucitavanje.value = false
             rezultat.fold(
-                onSuccess = { azurirani -> detail.value = azurirani; loadHistory() },
-                onFailure = { greska.value = it.message ?: "Nepoznata greška." },
+                onSuccess = { azurirani ->
+                    detail.value = azurirani
+                    loadHistory()
+                    ponoviPoruka.value = if (azurirani.jir != null)
+                        "✓ Račun je uspješno fiskaliziran (JIR dodijeljen)."
+                    else
+                        "✗ Fiskalizacija nije uspjela: ${azurirani.status}"
+                },
+                onFailure = {
+                    val poruka = it.message ?: "Nepoznata greška."
+                    greska.value = poruka
+                    ponoviPoruka.value = "✗ Fiskalizacija nije uspjela: $poruka"
+                },
             )
         }
     }
@@ -832,12 +884,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         val racunZaSlanje = si.racun.copy(nakDost = true)
         val ishod = service.fiskaliziraj(racunZaSlanje)
 
-        val status = when (val r = ishod.rezultat) {
-            is FiskalRezultat.Uspjeh -> "Fiskaliziran"
-            is FiskalRezultat.Greska -> "CIS greška: ${r.sifra} ${r.poruka}"
-            is FiskalRezultat.Neizvjesno -> "NEIZVJESNO — provjeri (možda fiskalizirano)"
-            is FiskalRezultat.Mreza -> "Nije poslano: ${r.poruka}"
-        }
+        val status = statusZaIshod(ishod)
+        zapisiFiskalLog(t.id, ishod, status)
         val azurirani = si.copy(racun = racunZaSlanje, jir = ishod.jir, zki = ishod.zki, qrUrl = ishod.qrUrl, status = status)
         invoiceStore.spremi(azurirani)
         azurirani

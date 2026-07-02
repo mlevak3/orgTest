@@ -10,8 +10,12 @@ data class FiskalIshod(
     val rezultat: FiskalRezultat,
     /** Sadržaj QR koda za provjeru računa (koristi JIR, a ZKI ako JIR nedostaje). */
     val qrUrl: String,
-    /** Potpisani SOAP zahtjev (za dijagnostiku / ispis). */
+    /** Potpisani SOAP zahtjev (za dijagnostiku / ispis / log fiskalizacije). */
     val zahtjevXml: String,
+    /** HTTP status odgovora CIS-a (-1 ako zahtjev nije ni poslan — mrežna greška). */
+    val httpKod: Int = -1,
+    /** Sirovo tijelo SOAP odgovora CIS-a (za log fiskalizacije). */
+    val odgovorXml: String = "",
 )
 
 /**
@@ -45,7 +49,8 @@ class FiskalService(
         val signed = XmlSigner.sign(built.racunZahtjev, certificate.privateKey, certificate.certificate)
         val soap = wrapSoap(signed)
 
-        val rezultat = FiskalClient(okolina, ignoreTlsTrust, extraCaCerts).posalji(soap)
+        val httpOdgovor = FiskalClient(okolina, ignoreTlsTrust, extraCaCerts).posalji(soap)
+        val rezultat = httpOdgovor.rezultat
         val jir = (rezultat as? FiskalRezultat.Uspjeh)?.jir
 
         val qrUrl = QrCodeContent.build(jir, zki, racun.datVrijeme, racun.iznosUkupno)
@@ -57,6 +62,8 @@ class FiskalService(
             rezultat = rezultat,
             qrUrl = qrUrl,
             zahtjevXml = soap,
+            httpKod = httpOdgovor.httpKod,
+            odgovorXml = httpOdgovor.rawTijelo,
         )
     }
 

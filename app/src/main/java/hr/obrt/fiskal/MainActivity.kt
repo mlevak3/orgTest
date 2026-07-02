@@ -18,6 +18,7 @@ import hr.obrt.fiskal.ui.AppViewModel
 import hr.obrt.fiskal.ui.ArticlesScreen
 import hr.obrt.fiskal.ui.CompanyListScreen
 import hr.obrt.fiskal.ui.HistoryScreen
+import hr.obrt.fiskal.ui.FiskalLogScreen
 import hr.obrt.fiskal.ui.HomeScreen
 import hr.obrt.fiskal.ui.InvoiceDetailScreen
 import hr.obrt.fiskal.ui.InvoiceScreen
@@ -31,7 +32,7 @@ import hr.obrt.fiskal.ui.theme.FiskalTheme
 import hr.obrt.fiskal.data.AppPreferences
 
 private enum class Screen {
-    CompanyList, Home, Settings, ActivityPicker, InvoiceSetup, Invoice, History, Detail, Articles, Partners, Reports
+    CompanyList, Home, Settings, ActivityPicker, InvoiceSetup, Invoice, History, Detail, Articles, Partners, Reports, FiskalLog
 }
 
 private val BOTTOM_NAV_SCREENS = setOf(Screen.Home, Screen.History, Screen.Articles, Screen.Partners, Screen.Reports)
@@ -54,6 +55,7 @@ class MainActivity : ComponentActivity() {
                     screen = when (screen) {
                         Screen.Detail -> Screen.History
                         Screen.InvoiceSetup -> if (vm.trebaOdabirDjelatnosti()) Screen.ActivityPicker else Screen.Home
+                        Screen.FiskalLog -> Screen.Settings
                         else -> Screen.Home
                     }
                 }
@@ -93,7 +95,10 @@ class MainActivity : ComponentActivity() {
                     Screen.Settings -> SettingsScreen(
                         vm,
                         onClose = { screen = if (vm.selected.value != null) Screen.Home else Screen.CompanyList },
+                        onOpenFiskalLog = { screen = Screen.FiskalLog },
                     )
+
+                    Screen.FiskalLog -> FiskalLogScreen(vm, onBack = { screen = Screen.Settings })
 
                     Screen.ActivityPicker -> ActivityPickerScreen(
                         vm,
