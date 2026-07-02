@@ -98,6 +98,19 @@ data class Izvjestaj(
     val poArtiklima: List<StavkaArtikl>,
 )
 
+/** Promet jednog dana za graf na početnoj. */
+data class DanPromet(val labela: String, val iznos: BigDecimal, val jeDanas: Boolean)
+
+/** Sažetak za tijelo početne stranice ispod hero zaglavlja. */
+data class PocetnaSazetak(
+    val nefiskBroj: Int,
+    val nefiskIznos: BigDecimal,
+    val poDanima: List<DanPromet>,
+    /** Trend prometa danas vs. jučer u postotcima; null = nedovoljno podataka za prikaz. */
+    val trendPostotak: Int?,
+    val zadnji: List<SavedInvoice>,
+)
+
 class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     val companyStore = CompanyStore(app)
@@ -653,6 +666,55 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     fun zadnjiRacun(): SavedInvoice? {
         val t = selected.value ?: return null
         return invoiceStore.zaTvrtku(t.id).firstOrNull()
+    }
+
+    /**
+     * Sažetak za tijelo početne stranice: nefiskalizirani računi (broj+iznos),
+     * promet po danima za zadnjih 7 dana s trendom, te zadnjih [nZadnjih] računa.
+     * Sve iz jednog čitanja povijesti.
+     */
+    fun pocetnaSazetak(nZadnjih: Int = 3): PocetnaSazetak {
+        val t = selected.value ?: return PocetnaSazetak(0, BigDecimal.ZERO, emptyList(), null, emptyList())
+        val svi = invoiceStore.zaTvrtku(t.id) // najnoviji prvi
+
+        val nefisk = svi.filter { it.jir == null }
+        val nefiskIznos = nefisk.fold(BigDecimal.ZERO) { a, si -> a.add(si.racun.iznosUkupno) }
+            .setScale(2, RoundingMode.HALF_UP)
+
+        val danMs = 24L * 60 * 60 * 1000
+        val danas0 = Calendar.getInstance().apply {
+            set(Calendar.HOUR_OF_DAY, 0); set(Calendar.MINUTE, 0); set(Calendar.SECOND, 0); set(Calendar.MILLISECOND, 0)
+        }.timeInMillis
+        val poDanima = (6 downTo 0).map { unatrag ->
+            val cal = Calendar.getInstance().apply { timeInMillis = danas0; add(Calendar.DAY_OF_YEAR, -unatrag) }
+            val start = cal.timeInMillis
+            val end = start + danMs
+            val iznos = svi.filter { it.createdAt in start until end }
+                .fold(BigDecimal.ZERO) { a, si -> a.add(si.racun.iznosUkupno) }
+                .setScale(2, RoundingMode.HALF_UP)
+            DanPromet(labelaDana(cal, jeDanas = unatrag == 0), iznos, unatrag == 0)
+        }
+
+        val danasI = poDanima.lastOrNull()?.iznos ?: BigDecimal.ZERO
+        val jucerI = poDanima.getOrNull(poDanima.size - 2)?.iznos ?: BigDecimal.ZERO
+        val trend = if (jucerI.signum() > 0)
+            danasI.subtract(jucerI).multiply(BigDecimal(100)).divide(jucerI, 0, RoundingMode.HALF_UP).toInt()
+        else null
+
+        return PocetnaSazetak(nefisk.size, nefiskIznos, poDanima, trend, svi.take(nZadnjih))
+    }
+
+    private fun labelaDana(cal: Calendar, jeDanas: Boolean): String {
+        if (jeDanas) return "Da"
+        return when (cal.get(Calendar.DAY_OF_WEEK)) {
+            Calendar.MONDAY -> "Po"
+            Calendar.TUESDAY -> "Ut"
+            Calendar.WEDNESDAY -> "Sr"
+            Calendar.THURSDAY -> "Če"
+            Calendar.FRIDAY -> "Pe"
+            Calendar.SATURDAY -> "Su"
+            else -> "Ne"
+        }
     }
 
     fun openDetail(si: SavedInvoice) { detail.value = si }
