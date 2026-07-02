@@ -210,22 +210,34 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     fun setBrojRacuna(v: String) { brojRacuna.value = v.filter(Char::isDigit) }
 
     /**
-     * Predloženi broj računa uvijek se čita izravno iz spremljenog stanja (a ne
-     * iz eventualno zastarjelih referenci u memoriji — npr. nakon što je
-     * "Postavke tvrtke" spremljeno preko starije kopije), kako broj uvijek
-     * odgovara stvarnom sljedećem broju prema postavkama slijednosti.
+     * Predloženi broj računa izvodi se iz STVARNO izdanih računa (povijest je
+     * redundantan izvor istine, ne interni brojač): najveći broj računa u
+     * tekućoj godini na tom poslovnom prostoru (slijednost P) odnosno
+     * prostoru+uređaju (slijednost N), uvećan za 1. Mjerodavna je oznaka koja
+     * je stvarno otisnuta na računu, pa broj ostaje ispravan i nakon promjena
+     * u postavkama (brisanje/ponovno dodavanje prostora, novi interni ID-evi…),
+     * a numeriranje se ispravno resetira s novom godinom.
      */
     private fun azurirajPredlozeniBroj() {
         val t = selected.value ?: return
         val d = selectedDjelatnost.value ?: return
         val p = selectedProstor.value ?: return
         val u = selectedUredjaj.value ?: return
-        val svjezaTvrtka = companyStore.sve().firstOrNull { it.id == t.id } ?: t
-        val svjezaDjelatnost = svjezaTvrtka.djelatnosti.firstOrNull { it.id == d.id } ?: d
-        val svjeziProstor = svjezaDjelatnost.poslovniProstori.firstOrNull { it.id == p.id } ?: p
-        val svjeziUredjaj = svjeziProstor.naplatniUredjaji.firstOrNull { it.id == u.id } ?: u
-        brojRacuna.value =
-            (if (svjezaDjelatnost.oznSlijed == OznSlijed.P) svjeziProstor.sljedeciBroj else svjeziUredjaj.sljedeciBroj).toString()
+        brojRacuna.value = sljedeciBrojIzPovijesti(t.id, d.oznSlijed, p.oznaka, u.oznaka).toString()
+    }
+
+    private fun sljedeciBrojIzPovijesti(tvrtkaId: String, slijed: OznSlijed, oznPosPr: String, oznNapUr: String): Long {
+        val pocetakGodine = Calendar.getInstance().apply {
+            set(Calendar.DAY_OF_YEAR, 1)
+            set(Calendar.HOUR_OF_DAY, 0); set(Calendar.MINUTE, 0); set(Calendar.SECOND, 0); set(Calendar.MILLISECOND, 0)
+        }.timeInMillis
+        val zadnji = invoiceStore.zaTvrtku(tvrtkaId)
+            .asSequence()
+            .filter { it.racun.datVrijeme.time >= pocetakGodine }
+            .filter { it.racun.zaglavlje.oznPosPr == oznPosPr }
+            .filter { slijed == OznSlijed.P || it.racun.zaglavlje.oznNapUr == oznNapUr }
+            .maxOfOrNull { it.racun.brOznRac } ?: 0L
+        return zadnji + 1
     }
 
     /** Nakon uspješne fiskalizacije: ponovno učita tvrtku i postavi selekciju na osvježene objekte. */
