@@ -5,6 +5,7 @@ import hr.obrt.fiskal.model.Racun
 /** Podaci potrebni za prikaz/ispis/email jednog računa. */
 data class ReceiptData(
     val naslovTvrtke: String,
+    val adresaTvrtke: String = "",
     val racun: Racun,
     val jir: String?,
     val zki: String,

@@ -70,6 +70,11 @@ object RacunXmlBuilder {
         sb.el("OibOper", z.oibOper)
         sb.el("ZastKod", zki)
         sb.el("NakDost", if (racun.nakDost) "true" else "false")
+        // OibPrimateljaRacuna je zadnji element u RacunType sekvenci (nakon NakDost i
+        // opcionalnih ParagonBrRac/SpecNamj koje ne šaljemo). Emitira se samo kad
+        // postoji OIB kupca — inače element izostaje (minOccurs=0), pa je poruka za
+        // obični B2C račun bajt-identična kao i prije.
+        racun.oibPrimatelja?.takeIf { it.isNotBlank() }?.let { sb.el("OibPrimateljaRacuna", it) }
         sb.append("</Racun>")
 
         sb.append("</RacunZahtjev>")

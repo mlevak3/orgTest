@@ -29,6 +29,7 @@ object ReceiptPdf {
         val tiny = Paint().apply { textSize = 8f; typeface = Typeface.MONOSPACE; isAntiAlias = true }
 
         val tinyH = 11f
+        val adresaLines = data.adresaTvrtke.takeIf { it.isNotBlank() }?.split('\n') ?: emptyList()
         val urlLines = wrap(data.qrUrl, tiny, pageWidth - 2 * margin)
         val kupacText = if (data.kupac.isNotBlank() || data.kupacOib.isNotBlank())
             "Kupac: ${data.kupac}" + (if (data.kupacOib.isNotBlank()) " (OIB ${data.kupacOib})" else "") else null
@@ -36,7 +37,7 @@ object ReceiptPdf {
         val napomenaLines = if (data.napomena.isNotBlank())
             wrap("Napomena: ${data.napomena}", normal, pageWidth - 2 * margin) else emptyList()
         val pdvBroj = if (z.uSustavuPdv) r.pdvGrupe().size + 1 else 1
-        val dodatne = (if (kupacText != null) 1 else 0) + (if (kupacAdresaText != null) 1 else 0) + napomenaLines.size
+        val dodatne = (if (kupacText != null) 1 else 0) + (if (kupacAdresaText != null) 1 else 0) + napomenaLines.size + adresaLines.size
         val brojLinija = 6 + 1 + 1 + r.stavke.size + 1 + pdvBroj + 1 + 1 + 1 + 1 + dodatne
         // Svaka stavka dobiva dodatni redak "kol. x cijena"; PDV obveznik još i redak neto/PDV.
         val podredciPoStavci = if (z.uSustavuPdv) 2 else 1
@@ -83,6 +84,7 @@ object ReceiptPdf {
         val tW = title.measureText("RAČUN")
         c.drawText("RAČUN", (pageWidth - tW) / 2f, y, title); y += lineH + 4f
         line(data.naslovTvrtke, p = bold)
+        adresaLines.forEach { line(it) }
         line("OIB: ${z.oib}")
         line("Račun: ${data.brojRacuna()}")
         line("Datum: $datum")

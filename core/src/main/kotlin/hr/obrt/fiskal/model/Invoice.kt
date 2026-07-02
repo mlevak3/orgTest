@@ -55,6 +55,21 @@ data class Zaglavlje(
     val oibOper: String,
 )
 
+/** Validacija hrvatskog OIB-a (11 znamenki + kontrolna znamenka po ISO 7064, MOD 11,10). */
+object Oib {
+    fun jeValjan(oib: String): Boolean {
+        if (oib.length != 11 || !oib.all { it.isDigit() }) return false
+        var ostatak = 10
+        for (i in 0 until 10) {
+            ostatak = (oib[i].digitToInt() + ostatak) % 10
+            if (ostatak == 0) ostatak = 10
+            ostatak = (ostatak * 2) % 11
+        }
+        val kontrolna = (11 - ostatak) % 10
+        return kontrolna == oib[10].digitToInt()
+    }
+}
+
 /** Kompletan račun spreman za fiskalizaciju. */
 data class Racun(
     val zaglavlje: Zaglavlje,
@@ -63,6 +78,12 @@ data class Racun(
     val stavke: List<Stavka>,
     val nacinPlac: NacinPlac,
     val nakDost: Boolean = false,
+    /**
+     * OIB primatelja računa (kupca) — šalje se u fiskalizaciju samo za hrvatske
+     * kupce s valjanim OIB-om. null/prazno = ne šalje se (obični B2C račun), pa
+     * XML ostaje bez tog elementa (minOccurs=0 u shemi). Ne utječe na ZKI.
+     */
+    val oibPrimatelja: String? = null,
 ) {
     /** Porezna grupa: stopa → (osnovica, iznos poreza). */
     data class PdvGrupa(val stopa: BigDecimal, val osnovica: BigDecimal, val iznos: BigDecimal)

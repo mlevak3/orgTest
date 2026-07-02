@@ -23,6 +23,7 @@ import hr.obrt.fiskal.fiskal.FiskalRezultat
 import hr.obrt.fiskal.fiskal.FiskalService
 import hr.obrt.fiskal.fiskal.ReceiptData
 import hr.obrt.fiskal.model.NacinPlac
+import hr.obrt.fiskal.model.Oib
 import hr.obrt.fiskal.model.OznSlijed
 import hr.obrt.fiskal.model.Racun
 import hr.obrt.fiskal.model.Stavka
@@ -475,6 +476,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 )
             },
             nacinPlac = nacinPlac.value,
+            // OIB kupca se šalje u fiskalizaciju samo za hrvatske kupce s valjanim OIB-om.
+            oibPrimatelja = kupacOib.value.trim().takeIf { Oib.jeValjan(it) },
         )
 
         val service = FiskalService(cert, t.okolina, t.ignoreTls, caCerts)
@@ -846,6 +849,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         val t = selected.value
         return ReceiptData(
             naslovTvrtke = t?.opis() ?: "",
+            adresaTvrtke = t?.adresa ?: "",
             racun = i.racun, jir = i.jir, zki = i.zki, qrUrl = i.qrUrl,
             kupac = kupacNaziv.value, kupacOib = kupacOib.value, kupacAdresa = kupacAdresa.value, napomena = napomena.value,
             logoPng = t?.let { companyStore.logoBytes(it.id) },
@@ -854,6 +858,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     fun receiptFromSaved(si: SavedInvoice) = ReceiptData(
         naslovTvrtke = si.naslovTvrtke,
+        adresaTvrtke = companies.firstOrNull { it.id == si.companyId }?.adresa ?: "",
         racun = si.racun,
         jir = si.jir,
         zki = si.zki,

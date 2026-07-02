@@ -16,6 +16,7 @@ import java.util.UUID
 data class Tvrtka(
     val id: String = UUID.randomUUID().toString(),
     var naziv: String = "",
+    var adresa: String = "",
     var oib: String = "",
     var uSustavuPdv: Boolean = false,
     var oibOper: String = "",
@@ -38,6 +39,7 @@ data class Tvrtka(
     fun toJson(): JSONObject = JSONObject().apply {
         put("id", id)
         put("naziv", naziv)
+        put("adresa", adresa)
         put("oib", oib)
         put("uSustavuPdv", uSustavuPdv)
         put("oibOper", oibOper)
@@ -81,6 +83,7 @@ data class Tvrtka(
             return Tvrtka(
                 id = o.optString("id", UUID.randomUUID().toString()),
                 naziv = o.optString("naziv"),
+                adresa = o.optString("adresa"),
                 oib = o.optString("oib"),
                 uSustavuPdv = o.optBoolean("uSustavuPdv"),
                 oibOper = o.optString("oibOper"),

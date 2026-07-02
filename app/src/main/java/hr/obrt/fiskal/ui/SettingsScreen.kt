@@ -70,6 +70,7 @@ fun SettingsScreen(vm: AppViewModel, onClose: () -> Unit) {
 
     // --- Tab 1: Podaci o tvrtki ---
     var naziv by remember { mutableStateOf(company.naziv) }
+    var adresa by remember { mutableStateOf(company.adresa) }
     var oib by remember { mutableStateOf(company.oib) }
     var pdv by remember { mutableStateOf(company.uSustavuPdv) }
     var oper by remember { mutableStateOf(company.oibOper) }
@@ -204,7 +205,7 @@ fun SettingsScreen(vm: AppViewModel, onClose: () -> Unit) {
         // otvaranju ekrana.
         val spremljenaTvrtka = store.sve().firstOrNull { it.id == company.id }
         val azurirana = company.copy(
-            naziv = naziv, oib = oib, uSustavuPdv = pdv, oibOper = oper,
+            naziv = naziv, adresa = adresa, oib = oib, uSustavuPdv = pdv, oibOper = oper,
             okolina = okolina, ignoreTls = ignoreTls,
             printerAddress = printerAddress,
             zadanaPdvStopa = zadanaPdvStopa, zadaniNacinPlac = zadaniNacinPlac, zadanaJedMjere = zadanaJedMjere,
@@ -266,7 +267,7 @@ fun SettingsScreen(vm: AppViewModel, onClose: () -> Unit) {
         ) {
             when (tab) {
                 0 -> TabPodaci(
-                    naziv, { naziv = it }, oib, { oib = it }, oper, { oper = it }, pdv, { pdv = it },
+                    naziv, { naziv = it }, adresa, { adresa = it }, oib, { oib = it }, oper, { oper = it }, pdv, { pdv = it },
                     zadanaPdvStopa, { zadanaPdvStopa = it }, zadaniNacinPlac, { zadaniNacinPlac = it },
                     zadanaJedMjere, { zadanaJedMjere = it },
                     logoPostoji,
@@ -359,6 +360,7 @@ fun SettingsScreen(vm: AppViewModel, onClose: () -> Unit) {
 @Composable
 private fun TabPodaci(
     naziv: String, setNaziv: (String) -> Unit,
+    adresa: String, setAdresa: (String) -> Unit,
     oib: String, setOib: (String) -> Unit,
     oper: String, setOper: (String) -> Unit,
     pdv: Boolean, setPdv: (Boolean) -> Unit,
@@ -372,6 +374,12 @@ private fun TabPodaci(
     OutlinedTextField(
         value = naziv, onValueChange = setNaziv,
         label = { Text("Naziv tvrtke / obrta") }, modifier = Modifier.fillMaxWidth(),
+    )
+    OutlinedTextField(
+        value = adresa, onValueChange = setAdresa,
+        label = { Text("Adresa tvrtke") },
+        placeholder = { Text("Ulica i broj, poštanski broj mjesto") },
+        modifier = Modifier.fillMaxWidth(),
     )
     OutlinedTextField(
         value = oib, onValueChange = { setOib(it.filter(Char::isDigit).take(11)) },

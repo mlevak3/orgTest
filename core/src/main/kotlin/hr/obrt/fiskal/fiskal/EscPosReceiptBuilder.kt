@@ -42,6 +42,7 @@ object EscPosReceiptBuilder {
         raw(intArrayOf(ESC, 0x40)) // init
 
         align(1); bold(true); ln(data.naslovTvrtke); bold(false)
+        if (data.adresaTvrtke.isNotBlank()) data.adresaTvrtke.split('\n').forEach { ln(it) }
         ln("OIB: ${z.oib}")
         ln("Racun: ${data.brojRacuna()}")
         ln(SimpleDateFormat("dd.MM.yyyy. HH:mm:ss", Locale.ROOT).format(r.datVrijeme))

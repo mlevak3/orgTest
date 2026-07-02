@@ -54,6 +54,7 @@ data class SavedInvoice(
         put("datVrijeme", racun.datVrijeme.time)
         put("nacinPlac", racun.nacinPlac.oznaka)
         put("nakDost", racun.nakDost)
+        put("oibPrimatelja", racun.oibPrimatelja ?: JSONObject.NULL)
         val arr = JSONArray()
         racun.stavke.forEach { s ->
             arr.put(JSONObject().apply {
@@ -99,6 +100,7 @@ data class SavedInvoice(
                 stavke = stavke,
                 nacinPlac = NacinPlac.fromOznaka(o.optString("nacinPlac", "G")),
                 nakDost = o.optBoolean("nakDost", false),
+                oibPrimatelja = if (o.isNull("oibPrimatelja")) null else o.optString("oibPrimatelja").ifBlank { null },
             )
             return SavedInvoice(
                 id = o.optString("id", UUID.randomUUID().toString()),
