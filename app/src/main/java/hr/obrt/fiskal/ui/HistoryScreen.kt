@@ -12,7 +12,9 @@ import androidx.compose.material.icons.rounded.ReceiptLong
 import androidx.compose.material.icons.rounded.Share
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -51,6 +53,9 @@ fun HistoryScreen(vm: AppViewModel, onOpen: (SavedInvoice) -> Unit, onBack: () -
     val fmt = remember { SimpleDateFormat("dd.MM.yyyy HH:mm", Locale.ROOT) }
     var q by remember { mutableStateOf("") }
     var filter by remember { mutableStateOf(FilterRacuna.SVI) }
+    /** Datumski filter Od/Do (epoch millis, do razine minute); null = bez ograničenja. */
+    var filterOd by remember { mutableStateOf<Long?>(null) }
+    var filterDo by remember { mutableStateOf<Long?>(null) }
 
     val danas = pocetakDana()
     val mjesec = pocetakMjeseca()
@@ -66,6 +71,10 @@ fun HistoryScreen(vm: AppViewModel, onOpen: (SavedInvoice) -> Unit, onBack: () -
             }
         }
         .filter { si ->
+            (filterOd?.let { si.createdAt >= it } ?: true) &&
+                (filterDo?.let { si.createdAt <= it } ?: true)
+        }
+        .filter { si ->
             q.isBlank() ||
                 si.brojRacuna().contains(q, true) ||
                 (si.jir ?: "").contains(q, true) ||
@@ -74,7 +83,7 @@ fun HistoryScreen(vm: AppViewModel, onOpen: (SavedInvoice) -> Unit, onBack: () -
         }
 
     Column(Modifier.fillMaxSize().background(t.bg)) {
-        LightHeader("Računi", "${vm.history.size} računa")
+        LightHeader("Računi", "${vm.history.size} računa", onBack = onBack)
 
         Column(Modifier.padding(horizontal = FiskalSpacing.screenX), verticalArrangement = Arrangement.spacedBy(FiskalSpacing.stackGap)) {
             FiskalCard(Modifier.fillMaxWidth()) {
@@ -89,6 +98,32 @@ fun HistoryScreen(vm: AppViewModel, onOpen: (SavedInvoice) -> Unit, onBack: () -
             Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 FilterRacuna.entries.forEach { f ->
                     FiskalChip(f.naziv, filter == f) { filter = f }
+                }
+            }
+
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
+                OutlinedButton(
+                    onClick = { odaberiDatumVrijeme(ctx, filterOd ?: pocetakDana()) { filterOd = it } },
+                    modifier = Modifier.weight(1f),
+                ) {
+                    Text(
+                        filterOd?.let { "Od: ${formatDatumVrijeme(it)}" } ?: "Od: —",
+                        style = MaterialTheme.typography.bodySmall,
+                        maxLines = 1,
+                    )
+                }
+                OutlinedButton(
+                    onClick = { odaberiDatumVrijeme(ctx, filterDo ?: System.currentTimeMillis()) { filterDo = it } },
+                    modifier = Modifier.weight(1f),
+                ) {
+                    Text(
+                        filterDo?.let { "Do: ${formatDatumVrijeme(it)}" } ?: "Do: —",
+                        style = MaterialTheme.typography.bodySmall,
+                        maxLines = 1,
+                    )
+                }
+                if (filterOd != null || filterDo != null) {
+                    TextButton(onClick = { filterOd = null; filterDo = null }) { Text("×") }
                 }
             }
         }
