@@ -96,6 +96,9 @@ fun SettingsScreen(vm: AppViewModel, onClose: () -> Unit, onOpenFiskalLog: () ->
     var pokaziBirac by remember { mutableStateOf(false) }
 
     var poruka by remember { mutableStateOf<String?>(null) }
+    // Dulje dijagnostičke poruke (provjera certifikata, test veze) prikazuju se u
+    // dijalogu — snackbar bi ih odrezao (npr. "Lanac" na kraju se ne vidi).
+    var dijalogPoruka by remember { mutableStateOf<String?>(null) }
     var tab by remember { mutableStateOf(0) }
 
     val btPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
@@ -297,32 +300,33 @@ fun SettingsScreen(vm: AppViewModel, onClose: () -> Unit, onOpenFiskalLog: () ->
                                 val ca = CaStore.loadExtraCas(ctx, store.caBytes(company.id))
                                 FiskalClient(okol, tls, ca).echo("test")
                             }
-                            poruka = res.fold(
-                                onSuccess = { "Veza OK (${okol.opis}). Odgovor: \"$it\"" },
-                                onFailure = { "Test veze nije uspio: ${it.message}" },
+                            poruka = null
+                            dijalogPoruka = res.fold(
+                                onSuccess = { "Veza OK (${okol.opis}).\n\nOdgovor: \"$it\"" },
+                                onFailure = { "Test veze nije uspio:\n\n${it.message}" },
                             )
                         }
                     },
                     onProvjeriCert = {
                         store.postaviLozinku(company.id, lozinka)
-                        poruka = if (store.certPostoji(company.id) && lozinka.isNotBlank()) {
-                            runCatching {
+                        if (store.certPostoji(company.id) && lozinka.isNotBlank()) {
+                            dijalogPoruka = runCatching {
                                 FiskalCertificate.load(store.certBytes(company.id)!!.inputStream(), lozinka.toCharArray())
                             }.fold(
                                 onSuccess = { c ->
                                     val datum = java.text.SimpleDateFormat("dd.MM.yyyy", java.util.Locale.ROOT).format(c.vrijediDo)
-                                    val upozorenje = if (!c.jeValjan) " ⚠ CERTIFIKAT JE ISTEKAO/NEVALJAN — CIS će ga odbiti." else ""
-                                    val okolinaUpozorenje = if (okolina == FiskalOkolina.TEST && !c.izdavatelj.contains("DEMO", ignoreCase = true))
-                                        " ⚠ Izdavatelj ne sadrži 'DEMO' — provjeri koristiš li stvarno FINA DEMO certifikat za testnu okolinu (produkcijski certifikat CIS test odbija s greškom potpisa)."
-                                    else ""
                                     val lanacInfo = if (c.chain.size <= 1)
-                                        " · Lanac: samo leaf (.p12 ne sadrži međucertifikat — CIS ga mora imati u svom trust storeu)."
-                                    else " · Lanac: ${c.chain.size} certifikata (šalje se cijeli lanac u potpis)."
-                                    "Certifikat OK. OIB: ${c.oibIzCertifikata ?: "?"} · Izdavatelj: ${c.izdavatelj} · Vrijedi do: $datum.$lanacInfo$upozorenje$okolinaUpozorenje"
+                                        "samo leaf (.p12 ne sadrži međucertifikat — CIS ga mora imati u svom trust storeu)"
+                                    else "${c.chain.size} certifikata (šalje se cijeli lanac u potpis)"
+                                    val upozorenje = if (!c.jeValjan) "\n\n⚠ CERTIFIKAT JE ISTEKAO/NEVALJAN — CIS će ga odbiti." else ""
+                                    val okolinaUpozorenje = if (okolina == FiskalOkolina.TEST && !c.izdavatelj.contains("DEMO", ignoreCase = true))
+                                        "\n\n⚠ Izdavatelj ne sadrži 'DEMO' — provjeri koristiš li stvarno FINA DEMO certifikat za testnu okolinu (produkcijski certifikat CIS test odbija s greškom potpisa)."
+                                    else ""
+                                    "Certifikat je ispravan.\n\nOIB: ${c.oibIzCertifikata ?: "?"}\nIzdavatelj: ${c.izdavatelj}\nVrijedi do: $datum\nLanac: $lanacInfo$upozorenje$okolinaUpozorenje"
                                 },
-                                onFailure = { "Certifikat/lozinka neispravni: ${it.message}" },
+                                onFailure = { "Certifikat ili lozinka nisu ispravni:\n\n${it.message}" },
                             )
-                        } else null
+                        }
                     },
                     onOpenFiskalLog = { vm.loadFiskalLog(); onOpenFiskalLog() },
                 )
@@ -364,6 +368,19 @@ fun SettingsScreen(vm: AppViewModel, onClose: () -> Unit, onOpenFiskalLog: () ->
                 }
             },
             confirmButton = { TextButton(onClick = { pokaziBirac = false }) { Text("Zatvori") } },
+        )
+    }
+
+    dijalogPoruka?.let { tekst ->
+        AlertDialog(
+            onDismissRequest = { dijalogPoruka = null },
+            title = { Text("Provjera") },
+            text = {
+                androidx.compose.foundation.text.selection.SelectionContainer {
+                    Text(tekst, style = MaterialTheme.typography.bodyMedium)
+                }
+            },
+            confirmButton = { TextButton(onClick = { dijalogPoruka = null }) { Text("U redu") } },
         )
     }
 }
