@@ -14,6 +14,14 @@ import java.security.cert.X509Certificate
 class FiskalCertificate private constructor(
     val privateKey: PrivateKey,
     val certificate: X509Certificate,
+    /**
+     * Cijeli lanac certifikata iz .p12 (krajnji/leaf certifikat prvi, pa
+     * međucertifikat(i)) — ako ga PKCS#12 sadrži. Šalje se u KeyInfo XML potpisa
+     * kako bi CIS mogao izgraditi put povjerenja i kad u svom trust storeu nema
+     * baš taj (npr. stariji demo) međucertifikat. Ako .p12 ima samo leaf, lanac
+     * je jednočlan.
+     */
+    val chain: List<X509Certificate>,
 ) {
     /** OIB iz certifikata (zadnjih 11 znamenki iz subject-a), ako se može pročitati. */
     val oibIzCertifikata: String? by lazy {
@@ -52,7 +60,13 @@ class FiskalCertificate private constructor(
             val cert = ks.getCertificate(alias) as? X509Certificate
                 ?: throw IllegalArgumentException("Unos '$alias' nema X.509 certifikat.")
 
-            return FiskalCertificate(key, cert)
+            // Cijeli lanac iz .p12 (leaf prvi); ako ga nema, koristi samo leaf.
+            val chain = ks.getCertificateChain(alias)
+                ?.mapNotNull { it as? X509Certificate }
+                ?.takeIf { it.isNotEmpty() }
+                ?: listOf(cert)
+
+            return FiskalCertificate(key, chain.first(), chain)
         }
     }
 }

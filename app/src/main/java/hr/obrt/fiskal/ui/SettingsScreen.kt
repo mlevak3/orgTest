@@ -315,7 +315,10 @@ fun SettingsScreen(vm: AppViewModel, onClose: () -> Unit, onOpenFiskalLog: () ->
                                     val okolinaUpozorenje = if (okolina == FiskalOkolina.TEST && !c.izdavatelj.contains("DEMO", ignoreCase = true))
                                         " ⚠ Izdavatelj ne sadrži 'DEMO' — provjeri koristiš li stvarno FINA DEMO certifikat za testnu okolinu (produkcijski certifikat CIS test odbija s greškom potpisa)."
                                     else ""
-                                    "Certifikat OK. OIB: ${c.oibIzCertifikata ?: "?"} · Izdavatelj: ${c.izdavatelj} · Vrijedi do: $datum.$upozorenje$okolinaUpozorenje"
+                                    val lanacInfo = if (c.chain.size <= 1)
+                                        " · Lanac: samo leaf (.p12 ne sadrži međucertifikat — CIS ga mora imati u svom trust storeu)."
+                                    else " · Lanac: ${c.chain.size} certifikata (šalje se cijeli lanac u potpis)."
+                                    "Certifikat OK. OIB: ${c.oibIzCertifikata ?: "?"} · Izdavatelj: ${c.izdavatelj} · Vrijedi do: $datum.$lanacInfo$upozorenje$okolinaUpozorenje"
                                 },
                                 onFailure = { "Certifikat/lozinka neispravni: ${it.message}" },
                             )

@@ -35,6 +35,13 @@ object XmlSigner {
         racunZahtjev: String,
         privateKey: PrivateKey,
         certificate: X509Certificate,
+        /**
+         * Lanac certifikata za KeyInfo (leaf prvi). KeyInfo NIJE dio potpisanog
+         * sadržaja (enveloped-signature transform ga uklanja prije digesta), pa
+         * dodavanje međucertifikata ne mijenja DigestValue/SignatureValue — samo
+         * daje CIS-u potpuni put povjerenja. Zadano: samo leaf (kao i dosad).
+         */
+        chain: List<X509Certificate> = listOf(certificate),
         referenceId: String = RacunXmlBuilder.SIGN_REFERENCE_ID,
     ): String {
         val b64 = Base64.getEncoder()
@@ -67,8 +74,10 @@ object XmlSigner {
         signer.update(signedInfoForSigning.toByteArray(Charsets.UTF_8))
         val signatureValue = b64.encodeToString(signer.sign())
 
-        // 4) KeyInfo
-        val certB64 = b64.encodeToString(certificate.encoded)
+        // 4) KeyInfo — svi certifikati iz lanca (leaf prvi), pa IssuerSerial leaf-a.
+        val certsXml = chain.joinToString("") {
+            "<X509Certificate>${b64.encodeToString(it.encoded)}</X509Certificate>"
+        }
         val issuerName = certificate.issuerX500Principal.name // RFC 2253
         val serial = certificate.serialNumber.toString()
 
@@ -79,7 +88,7 @@ object XmlSigner {
             "<SignatureValue>$signatureValue</SignatureValue>" +
             "<KeyInfo>" +
             "<X509Data>" +
-            "<X509Certificate>$certB64</X509Certificate>" +
+            certsXml +
             "<X509IssuerSerial>" +
             "<X509IssuerName>${escape(issuerName)}</X509IssuerName>" +
             "<X509SerialNumber>$serial</X509SerialNumber>" +

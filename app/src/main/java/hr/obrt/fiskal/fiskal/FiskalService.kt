@@ -46,7 +46,10 @@ class FiskalService(
         )
 
         val built = RacunXmlBuilder.build(racun, zki)
-        val signed = XmlSigner.sign(built.racunZahtjev, certificate.privateKey, certificate.certificate)
+        val signed = XmlSigner.sign(
+            built.racunZahtjev, certificate.privateKey, certificate.certificate,
+            chain = certificate.chain,
+        )
         val soap = wrapSoap(signed)
 
         val httpOdgovor = FiskalClient(okolina, ignoreTlsTrust, extraCaCerts).posalji(soap)
